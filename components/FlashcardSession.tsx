@@ -145,6 +145,12 @@ export default function FlashcardSession({ cards, title }: { cards: Flashcard[];
 
   // ── One card ─────────────────────────────────────────────────────────────
   const meta = KIND_META[card.kind];
+  const label = (
+    <div className="flex items-center gap-2">
+      <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${meta.cls}`}>{meta.label}</span>
+      <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">{card.moduleTitle}</span>
+    </div>
+  );
   return (
     <div>
       {/* progress */}
@@ -160,27 +166,35 @@ export default function FlashcardSession({ cards, title }: { cards: Flashcard[];
         </span>
       </div>
 
-      <button
-        type="button"
-        onClick={() => (revealed ? grade(true) : setRevealed(true))}
-        className="clay clay-surface flex min-h-[16rem] w-full flex-col items-center justify-center gap-4 p-8 text-center transition active:translate-y-px"
-      >
-        <div className="flex items-center gap-2">
-          <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${meta.cls}`}>{meta.label}</span>
-          <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">{card.moduleTitle}</span>
-        </div>
-
-        <p className="max-w-xl text-lg font-semibold leading-snug text-[var(--ink)]">{card.front}</p>
-
-        {revealed ? (
-          <>
+      {/* A real two-sided card (globals.css, "Flashcards"). Keyed so every new
+          card is dealt fresh — turning back over would flash the next card's
+          answer — and the hidden face is kept out of the accessible name. */}
+      <div key={`${i}:${card.id}`} className="card-deal depth-tilt">
+        <button
+          type="button"
+          onClick={() => (revealed ? grade(true) : setRevealed(true))}
+          className="card-3d"
+          data-face={revealed ? 'back' : 'front'}
+        >
+          <div
+            className="card-face card-face-front clay clay-surface flex min-h-[16rem] flex-col items-center justify-center gap-4 p-8 text-center"
+            aria-hidden={revealed}
+          >
+            {label}
+            <p className="max-w-xl text-lg font-semibold leading-snug text-[var(--ink)]">{card.front}</p>
+            <span className="text-xs font-medium text-[var(--muted)]">Tap or press space to reveal</span>
+          </div>
+          <div
+            className="card-face card-face-back clay clay-surface flex min-h-[16rem] flex-col items-center justify-center gap-4 p-8 text-center"
+            aria-hidden={!revealed}
+          >
+            {label}
+            <p className="max-w-xl text-lg font-semibold leading-snug text-[var(--ink)]">{card.front}</p>
             <span className="card-rule h-px w-16 bg-[var(--line)]" />
             <p className="card-answer max-w-xl whitespace-pre-line text-[15px] leading-relaxed text-[var(--ink)]">{card.back}</p>
-          </>
-        ) : (
-          <span className="text-xs font-medium text-[var(--muted)]">Tap or press space to reveal</span>
-        )}
-      </button>
+          </div>
+        </button>
+      </div>
 
       {/* grade */}
       <div className="mt-4 flex items-center justify-center gap-3">

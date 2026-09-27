@@ -757,6 +757,10 @@ body {
     transform: translateY(12px);
   }
   .motion [data-reveal][data-revealed] .lecture-body > * {
+    /* The resting state must be the arrived one: with backwards fill alone,
+       each section fell back to opacity 0 the moment its entrance ended. */
+    opacity: 1;
+    transform: none;
     animation: body-section-in 560ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
   }
   .motion [data-reveal][data-revealed] .lecture-body > *:nth-child(2) { animation-delay: 70ms; }
@@ -953,9 +957,12 @@ body {
   85%, 100% { translate: 520% 0; }
 }
 
+/* In depth, cards tip up out of the sheet. The depth terms vanish at
+   --depth: 0, leaving the flat rise exactly, and because the name never
+   changes, swapping depth never replays an entrance that already ran. */
 @keyframes card-arrive {
-  from { opacity: 0; transform: translateY(26px) scale(0.975); }
-  to { opacity: 1; transform: none; }
+  from { opacity: 0; transform: perspective(900px) translate3d(0, 26px, calc(var(--depth) * -130px)) rotateX(calc(var(--depth) * 24deg)) scale(0.975); }
+  to { opacity: 1; transform: perspective(900px) translate3d(0, 0, 0) rotateX(0deg) scale(1); }
 }
 
 @keyframes icon-settle {
@@ -1007,10 +1014,12 @@ body {
   to { opacity: 1; transform: none; }
 }
 
+/* In depth, each step swings down into place like a flap (pivoting on its
+   top edge — see .mechanism-node in the depth block). Flat, the rise as ever. */
 @keyframes mechanism-node-in {
-  from { opacity: 0; transform: translateY(8px) scale(0.96); }
-  70% { opacity: 1; transform: translateY(-1px) scale(1.01); }
-  to { opacity: 1; transform: none; }
+  from { opacity: 0; transform: perspective(520px) translateY(8px) rotateX(calc(var(--depth) * -80deg)) scale(0.96); }
+  70% { opacity: 1; transform: perspective(520px) translateY(-1px) rotateX(calc(var(--depth) * 9deg)) scale(1.01); }
+  to { opacity: 1; transform: perspective(520px) translateY(0) rotateX(0deg) scale(1); }
 }
 
 @keyframes arrow-pulse {
@@ -1170,5 +1179,672 @@ html[data-motion-paused] { scroll-behavior: auto; }
   .motion .page-decoration::after,
   .motion [data-reveal] .section-rule::after {
     transform: none !important;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   DEPTH — the interface in three dimensions.
+
+   One registered custom property, --depth, drives everything. Every offset,
+   angle and shadow below is a multiple of it, so --depth: 0 is the flat design
+   exactly and --depth: 1 is the full dimensional treatment. Toggling the class
+   animates the property, so the interface travels between the two in place —
+   no reflow, no remount, scroll position and component state untouched.
+   Dragging the header control scrubs the same property by hand.
+
+   Two rules keep it honest:
+   · Perspective only reaches an element's direct children. A surface that
+     moves in Z therefore carries its own perspective() in its transform, and
+     every multi-layer scene (hero, flashcard, skeleton) owns a local stage.
+   · Nothing holds a 3D transform at rest. Elevation at rest is light and
+     shadow; transforms exist only while something moves — a hover, an
+     arrival, a turn, the swap itself. The page never turns every card into a
+     GPU layer, and prose stays rasterised crisp at its own scale.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+@property --depth {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+:root {
+  --depth: 0;
+  --depth-ease: cubic-bezier(0.22, 0.68, 0.16, 1);
+
+  /* Written by components/LiveryMotion.tsx. --px/--py: the pointer inside the
+     hovered surface (-1..1). --tilt: that surface's angle budget in degrees,
+     smaller for wide surfaces so every edge travels about the same distance.
+     --sx/--sy: the pointer inside the current scene. Neutral until a pointer
+     arrives. */
+  --px: 0;
+  --py: 0;
+  --tilt: 8;
+  --sx: 0;
+  --sy: 0;
+
+  /* Elevation, carried by light. */
+  --lift-shadow:
+    0 calc(var(--depth) * 1px) calc(var(--depth) * 2px) rgba(15, 30, 60, calc(var(--depth) * 0.05)),
+    0 calc(var(--depth) * 10px) calc(var(--depth) * 22px) calc(var(--depth) * -10px) rgba(15, 30, 60, calc(var(--depth) * 0.2));
+  --lift-shadow-high:
+    0 calc(var(--depth) * 2px) calc(var(--depth) * 4px) rgba(15, 30, 60, calc(var(--depth) * 0.06)),
+    0 calc(var(--depth) * 28px) calc(var(--depth) * 46px) calc(var(--depth) * -18px) rgba(15, 30, 60, calc(var(--depth) * 0.32));
+  --well-shadow: inset 0 calc(var(--depth) * 2px) calc(var(--depth) * 5px) rgba(15, 30, 60, calc(var(--depth) * 0.09));
+}
+
+.dark {
+  --lift-shadow:
+    0 calc(var(--depth) * 1px) calc(var(--depth) * 2px) rgba(0, 0, 0, calc(var(--depth) * 0.3)),
+    0 calc(var(--depth) * 12px) calc(var(--depth) * 26px) calc(var(--depth) * -10px) rgba(0, 0, 0, calc(var(--depth) * 0.55));
+  --lift-shadow-high:
+    0 calc(var(--depth) * 2px) calc(var(--depth) * 4px) rgba(0, 0, 0, calc(var(--depth) * 0.4)),
+    0 calc(var(--depth) * 30px) calc(var(--depth) * 50px) calc(var(--depth) * -18px) rgba(0, 0, 0, calc(var(--depth) * 0.72));
+  --well-shadow: inset 0 calc(var(--depth) * 2px) calc(var(--depth) * 6px) rgba(0, 0, 0, calc(var(--depth) * 0.35));
+}
+
+:root.depth {
+  --depth: 1;
+}
+
+/* The morph itself. Animating a registered property is what makes this a
+   transition rather than a restyle. */
+html {
+  transition: --depth 720ms var(--depth-ease);
+}
+/* While the control is being dragged the property follows the hand directly. */
+html[data-depth-scrub] {
+  transition: none;
+}
+
+@layer components {
+  /* ── Elevation ───────────────────────────────────────────────────────────
+     Every study surface already shares these class names, so depth arrives
+     everywhere at once rather than page by page. Raised surfaces cast light;
+     insets and tracks become wells. */
+  .clay,
+  .clay-pill,
+  .clay-node,
+  .subject-card,
+  .featured-module,
+  .primary-action {
+    box-shadow: var(--lift-shadow);
+  }
+  .clay-inset,
+  .library-modes,
+  .subject-card-unavailable {
+    box-shadow: var(--well-shadow);
+  }
+  .library-modes::before,
+  .header-link[aria-current="page"] {
+    box-shadow: var(--lift-shadow);
+  }
+  /* The one surface that already cast a shadow keeps it. */
+  .tutor-trigger {
+    box-shadow: 0 4px 20px rgb(0 0 0 / 5%), var(--lift-shadow);
+  }
+  .site-header {
+    box-shadow: 0 calc(var(--depth) * 10px) calc(var(--depth) * 30px) calc(var(--depth) * -18px) rgba(15, 30, 60, calc(var(--depth) * 0.28));
+  }
+  .dark .site-header {
+    box-shadow: 0 calc(var(--depth) * 12px) calc(var(--depth) * 34px) calc(var(--depth) * -18px) rgba(0, 0, 0, calc(var(--depth) * 0.6));
+  }
+
+  /* ── Interactive surfaces turn toward the pointer ────────────────────────
+     Only while hovered, only with a fine pointer, and only with motion on —
+     the tilt is movement, so the pause control stops it too. The rotation
+     carries its own perspective, so it reads as a turn at any nesting depth.
+     Reading panels are deliberately absent: prose never tilts. */
+  .motion :is(a.subject-card, a.clay, a.clay-node, .featured-module, .depth-tilt) {
+    transition-property: color, background-color, border-color, box-shadow, translate, scale, transform;
+    transition-duration: 240ms;
+    transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    :root.depth.motion :is(a.subject-card, a.clay, a.clay-node, .featured-module, .depth-tilt):hover {
+      transform: perspective(900px)
+        rotateX(calc(var(--py) * var(--depth) * var(--tilt) * -1deg))
+        rotateY(calc(var(--px) * var(--depth) * var(--tilt) * 1deg))
+        translateZ(calc(var(--depth) * 18px));
+    }
+    :root.depth.motion :is(a.subject-card, a.clay, a.clay-node, .featured-module):hover {
+      box-shadow:
+        0 12px 26px -14px color-mix(in srgb, var(--accent) 35%, transparent),
+        var(--lift-shadow-high);
+    }
+    /* The featured panel's reveal transition is slow and delayed; answering
+       the pointer must not be. */
+    :root.depth.motion .featured-module[data-revealed]:hover {
+      transition-duration: 240ms;
+      transition-delay: 0s;
+    }
+    /* A glint that follows the pointer across the surface — the cue that
+       sells a tilted plane as a physical one. */
+    :root.depth.motion :is(a.clay, a.clay-node):hover {
+      background-image: radial-gradient(
+        circle at calc(50% + var(--px) * 50%) calc(50% + var(--py) * 50%),
+        color-mix(in srgb, var(--accent) 10%, transparent),
+        transparent 65%
+      );
+    }
+  }
+  /* Block cards take the glint as a layer under their content, so it never
+     washes over the text. */
+  a.subject-card {
+    isolation: isolate;
+  }
+  a.subject-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    pointer-events: none;
+    background: radial-gradient(
+      circle at calc(50% + var(--px) * 50%) calc(50% + var(--py) * 50%),
+      rgba(255, 255, 255, calc(var(--depth) * 0.75)),
+      transparent 60%
+    );
+    opacity: 0;
+    transition: opacity 220ms ease;
+  }
+  .dark a.subject-card::before {
+    background: radial-gradient(
+      circle at calc(50% + var(--px) * 50%) calc(50% + var(--py) * 50%),
+      rgba(145, 176, 255, calc(var(--depth) * 0.16)),
+      transparent 60%
+    );
+  }
+  .motion a.subject-card:hover::before {
+    opacity: 1;
+  }
+
+  /* ── Arrivals come out of the depth ──────────────────────────────────────
+     Block cards tip up out of the sheet (card-arrive), mechanism steps swing
+     down into place like flaps (mechanism-node-in), and sections travel
+     forward instead of only rising. Entrances keep one animation name in both
+     modes and fold --depth into their keyframes, so a swap never replays one
+     that already ran; each ends at the identity and leaves no transform. */
+  .mechanism-node {
+    transform-origin: 50% calc((1 - var(--depth)) * 50%);
+  }
+  :root.depth.motion [data-reveal] {
+    transform-origin: 50% min(50%, 320px);
+  }
+  :root.depth.motion [data-reveal]:not([data-revealed]) {
+    transform: perspective(1200px) translate3d(0, 14px, calc(var(--depth) * -80px));
+  }
+
+  /* Whole pages arrive out of the depth on every navigation. At depth 0 the
+     keyframes resolve to the identity, so the flat design is untouched, and
+     because the rule matches in both modes, flipping depth never replays it. */
+  .motion main:not(.skeleton-stage) {
+    transform-origin: 50% 220px;
+    animation: page-arrive 780ms var(--depth-ease) backwards;
+  }
+
+  /* The swap itself: a one-shot camera move on the page plane while the
+     property travels. Rising, the sheet swings back so the layers can be seen
+     separating; flattening, it is pressed back into one plane. page-arrive
+     stays first in the list so the finished arrival is not replayed. The
+     pivot (--morph-oy) is the middle of the viewport, set by DepthToggle. */
+  .motion[data-depth-morph="rise"] main:not(.skeleton-stage) {
+    transform-origin: 50% var(--morph-oy, 40vh);
+    animation:
+      page-arrive 780ms var(--depth-ease) backwards,
+      depth-rise 960ms cubic-bezier(0.45, 0, 0.2, 1);
+  }
+  .motion[data-depth-morph="flatten"] main:not(.skeleton-stage) {
+    transform-origin: 50% var(--morph-oy, 40vh);
+    animation:
+      page-arrive 780ms var(--depth-ease) backwards,
+      depth-flatten 640ms cubic-bezier(0.45, 0, 0.2, 1);
+  }
+
+  /* ── The page frame recedes ──────────────────────────────────────────────
+     Self-contained stage: .page-decoration is fixed and its pseudo-elements
+     are its only children, so its perspective reaches exactly them. */
+  .page-decoration {
+    perspective: 1500px;
+    perspective-origin: 50% 40vh;
+  }
+  .page-decoration::before {
+    transform: translateZ(calc(var(--depth) * -60px));
+  }
+  .page-decoration::after {
+    transform: translateZ(calc(var(--depth) * -36px));
+  }
+  .motion .page-decoration::after {
+    transform: translate3d(0, calc(var(--scroll-progress, 0) * -90px), calc(var(--depth) * -36px));
+  }
+
+  /* ── The depth control reads as what it does ─────────────────────────────
+     A cube facing you in depth; a sheet lying down when flat. */
+  .depth-toggle {
+    touch-action: pan-y;
+  }
+  .depth-toggle svg {
+    transform: perspective(64px) rotateX(calc((1 - var(--depth)) * 56deg));
+  }
+  html[data-depth-scrub],
+  html[data-depth-scrub] .depth-toggle {
+    cursor: ew-resize;
+  }
+  html[data-depth-scrub] .depth-toggle {
+    background: var(--surface-muted);
+    color: var(--accent);
+  }
+
+  /* ── Hero: the one theatrical scene ──────────────────────────────────────
+     A local stage (overflow clips it but does not cancel perspective). The
+     livery flash floats well in front, the timing traces sit far behind, and
+     the two drift against each other with the pointer. The headline stays on
+     the sheet at Z 0 so it never softens. */
+  .home-hero {
+    perspective: 1000px;
+    perspective-origin: 80% 10%;
+  }
+  .hero-stripes {
+    transform:
+      translate3d(calc(var(--sx) * var(--depth) * -22px), calc(var(--sy) * var(--depth) * -12px), calc(var(--depth) * 70px))
+      skew(-24deg);
+    transition: transform 600ms var(--depth-ease);
+  }
+  .hero-traces {
+    transform:
+      translate3d(calc(var(--sx) * var(--depth) * 16px), calc(var(--sy) * var(--depth) * 9px), calc(var(--depth) * -120px))
+      scale(calc(1 + var(--depth) * 0.12));
+    transition: transform 800ms var(--depth-ease);
+  }
+
+  /* ── Overlays swing down out of the depth ───────────────────────────────── */
+  :root.depth.motion .modal-panel {
+    transform-origin: 50% 0;
+    animation: depth-emerge 460ms var(--depth-ease) backwards;
+  }
+
+  /* ── Flashcards: the one literal 3D object ───────────────────────────────
+     .card-deal is the stage — its perspective reaches the card, its direct
+     child — and replays the deal each time a new card mounts. The faces share
+     one grid cell, so the card is always as tall as its longer side and never
+     resizes mid-turn. The back face counter-rotates by exactly what the card
+     turns, so whichever face is showing stays front-facing and readable at
+     every value of --depth, mid-swap and mid-scrub included. Flat, the faces
+     cross-fade instead. */
+  .card-deal {
+    perspective: 1600px;
+  }
+  .motion .card-deal {
+    animation: card-deal 580ms var(--depth-ease) backwards;
+  }
+  .card-3d {
+    display: grid;
+    width: 100%;
+    transform-style: preserve-3d;
+    transition: transform 720ms cubic-bezier(0.3, 0.85, 0.25, 1);
+  }
+  .card-3d[data-face="back"] {
+    transform: rotateY(calc(var(--depth) * 180deg));
+  }
+  /* Pressing nudges the card, as it always did — through translate, so it
+     composes with the turn instead of replacing it. */
+  .card-3d:active {
+    translate: 0 1px;
+  }
+  .card-3d > .card-face {
+    grid-area: 1 / 1;
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    transition: opacity 0s;
+  }
+  .card-3d > .card-face-back {
+    transform: rotateY(calc(360deg - var(--depth) * 180deg));
+  }
+  /* The face turning away is dropped only once the turn has hidden it. */
+  .card-3d[data-face="front"] > .card-face-back,
+  .card-3d[data-face="back"] > .card-face-front {
+    opacity: 0;
+    transition: opacity 0s linear 720ms;
+  }
+  :root:not(.depth) .card-3d[data-face] > .card-face {
+    transition: opacity 260ms ease;
+  }
+  /* The rule draws and the answer rises once the card has turned (at once,
+     when flat). */
+  .motion .card-3d[data-face="front"] :is(.card-rule, .card-answer) {
+    animation: none;
+  }
+  .motion .card-3d[data-face="back"] .card-rule {
+    transform-origin: left center;
+    animation: livery-lay 360ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+    animation-delay: calc(var(--depth) * 320ms);
+  }
+  .motion .card-3d[data-face="back"] .card-answer {
+    animation: livery-rise 420ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+    animation-delay: calc(90ms + var(--depth) * 320ms);
+  }
+
+  /* ── Skeletons ───────────────────────────────────────────────────────────
+     Every route ships its own skeleton, laid out like the page it stands in
+     for. In depth the whole layout lies on a sheet tipped back into the scene
+     — the same pose the real page arrives from, so the page stands up out of
+     its own skeleton — and its parts float above the sheet at their own
+     heights. These are the shared primitives; each route adds its own motif.
+     Flat, it is a plain placeholder in the page's shape. */
+  .skeleton-stage {
+    perspective: 1400px;
+    perspective-origin: 50% 220px;
+  }
+  .sk-plane {
+    transform-style: preserve-3d;
+    transform-origin: 50% 190px;
+    transform: translate3d(0, 0, calc(var(--depth) * -90px)) rotateX(calc(var(--depth) * 8deg));
+  }
+  .motion .sk-plane {
+    animation:
+      sk-plane-in 620ms var(--depth-ease) backwards,
+      sk-plane-drift 9s ease-in-out 620ms infinite;
+  }
+  .sk-plane :is(div, section, header, nav, aside, ul, ol, li, footer) {
+    transform-style: preserve-3d;
+  }
+  .sk {
+    display: block;
+    position: relative;
+    overflow: hidden;
+    border-radius: 6px;
+    background: var(--surface-muted);
+    transform: translateZ(calc(var(--depth) * 1px));
+  }
+  .sk-ink {
+    background: color-mix(in srgb, var(--ink) 14%, var(--surface-muted));
+  }
+  .sk-accent {
+    background: color-mix(in srgb, var(--accent) 24%, var(--surface-muted));
+  }
+  .sk-livery {
+    background: linear-gradient(90deg, var(--stripe-ink) 0 78%, var(--wm-red) 78% 89%, var(--wm-yellow) 89%);
+    opacity: 0.55;
+  }
+  .sk-card {
+    position: relative;
+    background: var(--clay-surface);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    box-shadow: var(--lift-shadow);
+  }
+  .sk-well {
+    background: var(--surface-muted);
+    border: 1px solid var(--line);
+    box-shadow: var(--well-shadow);
+  }
+  /* Height above the sheet, in px at full depth: set --z inline. */
+  .sk-z {
+    transform: translateZ(calc(var(--depth) * var(--z, 12) * 1px));
+  }
+  /* A stack of the same card receding behind it. */
+  .sk-stack::before,
+  .sk-stack::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border: 1px solid var(--line);
+    border-radius: inherit;
+    background: var(--clay-surface);
+    box-shadow: var(--lift-shadow);
+    opacity: var(--depth);
+  }
+  .sk-stack::before {
+    transform: translate3d(calc(var(--depth) * 7px), calc(var(--depth) * 7px), calc(var(--depth) * -14px));
+  }
+  .sk-stack::after {
+    transform: translate3d(calc(var(--depth) * 14px), calc(var(--depth) * 14px), calc(var(--depth) * -28px));
+  }
+  /* The sweep travels along the livery diagonal, and only when motion is on. */
+  .motion .sk::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.55) 50%, transparent 80%);
+    transform: translateX(-100%);
+    animation: sk-sweep 1600ms ease-in-out infinite;
+    animation-delay: calc(var(--i, 0) * 60ms);
+  }
+  /* .dark and .motion both sit on <html>, so they compound. */
+  .dark.motion .sk::after {
+    background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.07) 50%, transparent 80%);
+  }
+
+  /* Route motifs. Each skeleton opts into the movement that says what it is
+     waiting for. All of them ride on --depth, so flat they are still. */
+  .motion .sk-wave > * {
+    animation: sk-bob 3.2s ease-in-out infinite;
+    animation-delay: calc(var(--i, 0) * -0.4s);
+  }
+  .motion .sk-rise > * {
+    transform-origin: 50% 100%;
+    animation: sk-rise 1.1s var(--depth-ease) backwards;
+    animation-delay: calc(var(--i, 0) * 110ms);
+  }
+  .motion .sk-flaps > * {
+    transform-origin: 50% 0;
+    animation: sk-flap 2.6s cubic-bezier(0.45, 0, 0.2, 1) infinite;
+    animation-delay: calc(var(--i, 0) * 180ms);
+  }
+  .motion .sk-peel {
+    transform-origin: 0% 100%;
+    animation: sk-peel 3.4s cubic-bezier(0.45, 0, 0.2, 1) infinite;
+  }
+  .motion .sk-orbit > * {
+    animation: sk-orbit 7s ease-in-out infinite;
+    animation-delay: calc(var(--i, 0) * -1.1s);
+  }
+  .motion .sk-pull {
+    animation: sk-pull 3s cubic-bezier(0.45, 0, 0.2, 1) infinite;
+  }
+  /* Cards fanned out behind the one on top — only in depth. */
+  .sk-fan-card {
+    position: absolute;
+    inset: 0;
+    opacity: var(--depth);
+    transform:
+      translate3d(calc(var(--depth) * var(--fx, 0) * 1px), calc(var(--depth) * var(--fy, 0) * 1px), calc(var(--depth) * var(--z, -20) * 1px))
+      rotateZ(calc(var(--depth) * var(--r, 0) * 1deg));
+  }
+  .motion .sk-fan .sk-fan-card {
+    animation: sk-fan 4.4s ease-in-out infinite;
+  }
+  /* A bookmark ribbon hanging above a saved card. */
+  .sk-ribbon {
+    display: block;
+    width: 12px;
+    height: 22px;
+    background: color-mix(in srgb, var(--wm-yellow) 75%, transparent);
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 74%, 0 100%);
+    opacity: calc(0.35 + var(--depth) * 0.65);
+  }
+  /* A tile extruded into a column: its solid edge grows with its height. */
+  .sk-column {
+    box-shadow:
+      0 calc(var(--depth) * var(--z, 20) * 0.4px) 0 -1px color-mix(in srgb, var(--accent) 26%, var(--line)),
+      var(--lift-shadow);
+  }
+}
+
+@keyframes page-arrive {
+  from {
+    opacity: calc(1 - var(--depth) * 0.6);
+    transform: perspective(1400px) translate3d(0, 0, calc(var(--depth) * -90px)) rotateX(calc(var(--depth) * 8deg));
+  }
+  to {
+    opacity: 1;
+    transform: perspective(1400px) translate3d(0, 0, 0) rotateX(0deg);
+  }
+}
+
+@keyframes depth-rise {
+  0%,
+  100% {
+    transform: perspective(1600px) translate3d(0, 0, 0) rotateX(0deg);
+  }
+  42% {
+    transform: perspective(1600px) translate3d(0, 0, -130px) rotateX(11deg);
+  }
+}
+
+@keyframes depth-flatten {
+  0%,
+  100% {
+    transform: perspective(1600px) translate3d(0, 0, 0) rotateX(0deg);
+  }
+  38% {
+    transform: perspective(1600px) translate3d(0, 0, -60px) rotateX(-3deg);
+  }
+}
+
+@keyframes depth-emerge {
+  from {
+    opacity: 0;
+    transform: perspective(1200px) translate3d(0, -10px, calc(var(--depth) * -160px)) rotateX(calc(var(--depth) * -14deg));
+  }
+  to {
+    opacity: 1;
+    transform: perspective(1200px) translate3d(0, 0, 0) rotateX(0deg);
+  }
+}
+
+/* A new card is dealt in from the deck on the right. Flat, it simply appears,
+   as it always did. */
+@keyframes card-deal {
+  from {
+    opacity: calc(1 - var(--depth));
+    transform: perspective(1600px) translate3d(calc(var(--depth) * 70px), calc(var(--depth) * 12px), calc(var(--depth) * -180px)) rotateY(calc(var(--depth) * -18deg)) rotateZ(calc(var(--depth) * 3deg));
+  }
+  to {
+    opacity: 1;
+    transform: perspective(1600px) translate3d(0, 0, 0) rotateY(0deg) rotateZ(0deg);
+  }
+}
+
+@keyframes sk-sweep {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes sk-plane-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 0, calc(var(--depth) * -200px)) rotateX(calc(var(--depth) * 18deg));
+  }
+}
+
+@keyframes sk-plane-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, calc(var(--depth) * -90px)) rotateX(calc(var(--depth) * 8deg)) rotateY(0deg);
+  }
+  50% {
+    transform: translate3d(0, 0, calc(var(--depth) * -98px)) rotateX(calc(var(--depth) * 9.5deg)) rotateY(calc(var(--depth) * -1.4deg));
+  }
+}
+
+@keyframes sk-bob {
+  0%,
+  100% {
+    transform: translateZ(calc(var(--depth) * var(--z, 10) * 1px));
+  }
+  50% {
+    transform: translateZ(calc(var(--depth) * (var(--z, 10) + var(--amp, 18)) * 1px));
+  }
+}
+
+@keyframes sk-rise {
+  from {
+    transform: translateZ(calc(var(--depth) * -40px)) scaleY(0.2);
+    opacity: 0;
+  }
+}
+
+@keyframes sk-flap {
+  0%,
+  18% {
+    transform: translateZ(calc(var(--depth) * var(--z, 8) * 1px)) rotateX(calc(var(--depth) * -88deg));
+  }
+  34%,
+  82% {
+    transform: translateZ(calc(var(--depth) * var(--z, 8) * 1px)) rotateX(0deg);
+  }
+  100% {
+    transform: translateZ(calc(var(--depth) * var(--z, 8) * 1px)) rotateX(calc(var(--depth) * 88deg));
+  }
+}
+
+@keyframes sk-peel {
+  0%,
+  30%,
+  100% {
+    transform: translateZ(calc(var(--depth) * var(--z, 24) * 1px)) rotateX(0deg) rotateZ(0deg);
+  }
+  55%,
+  70% {
+    transform: translate3d(calc(var(--depth) * 26px), calc(var(--depth) * -18px), calc(var(--depth) * (var(--z, 24) + 60) * 1px)) rotateX(calc(var(--depth) * 10deg)) rotateZ(calc(var(--depth) * 4deg));
+  }
+}
+
+@keyframes sk-orbit {
+  0%,
+  100% {
+    transform: translate3d(0, 0, calc(var(--depth) * var(--z, 20) * 1px));
+  }
+  33% {
+    transform: translate3d(calc(var(--depth) * 6px), calc(var(--depth) * -5px), calc(var(--depth) * (var(--z, 20) + 22) * 1px));
+  }
+  66% {
+    transform: translate3d(calc(var(--depth) * -5px), calc(var(--depth) * 4px), calc(var(--depth) * (var(--z, 20) + 8) * 1px));
+  }
+}
+
+@keyframes sk-pull {
+  0%,
+  25%,
+  100% {
+    transform: translate3d(0, 0, calc(var(--depth) * var(--z, 20) * 1px));
+  }
+  50%,
+  75% {
+    transform: translate3d(calc(var(--depth) * 18px), 0, calc(var(--depth) * (var(--z, 20) + 46) * 1px)) rotateY(calc(var(--depth) * -8deg));
+  }
+}
+
+@keyframes sk-fan {
+  0%,
+  100% {
+    transform:
+      translate3d(calc(var(--depth) * var(--fx, 0) * 0.7px), calc(var(--depth) * var(--fy, 0) * 1px), calc(var(--depth) * var(--z, -20) * 1px))
+      rotateZ(calc(var(--depth) * var(--r, 0) * 0.7deg));
+  }
+  50% {
+    transform:
+      translate3d(calc(var(--depth) * var(--fx, 0) * 1.15px), calc(var(--depth) * var(--fy, 0) * 1px), calc(var(--depth) * var(--z, -20) * 1px))
+      rotateZ(calc(var(--depth) * var(--r, 0) * 1.15deg));
+  }
+}
+
+/* Depth is motion. When the system asks for less, there is none: the scale
+   collapses to zero and every stage becomes inert. */
+@media (prefers-reduced-motion: reduce) {
+  :root,
+  :root.depth {
+    --depth: 0 !important;
+  }
+  html {
+    transition: none !important;
+  }
+  .page-decoration,
+  .home-hero,
+  .card-deal,
+  .skeleton-stage {
+    perspective: none !important;
   }
 }

@@ -6,6 +6,7 @@ import ThemeToggle from './ThemeToggle';
 import WilliamsHubLogo from './WilliamsHubLogo';
 import CommandPalette from './CommandPalette';
 import MotionToggle from './MotionToggle';
+import DepthToggle from './DepthToggle';
 import HubIcon, { type HubIconName } from './HubIcon';
 
 const NAV: { href: string; icon: HubIconName; label: string }[] = [
@@ -44,6 +45,7 @@ export default function Header() {
         </nav>
         <div className="flex items-center sm:gap-1 md:border-l md:border-[var(--line)] md:pl-3">
           <CommandPalette />
+          <DepthToggle />
           <MotionToggle />
           <ThemeToggle />
         </div>

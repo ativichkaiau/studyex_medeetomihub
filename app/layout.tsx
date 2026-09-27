@@ -5,6 +5,7 @@ import Header from '../components/Header';
 import AskAI from '../components/AskAI';
 import LiveryMotion from '../components/LiveryMotion';
 import { appearanceScript } from '../lib/appearance';
+import { depthScript } from '../lib/depth';
 
 export const metadata: Metadata = {
   title: 'WilliamsHub — Study OS',
@@ -20,8 +21,9 @@ export const metadata: Metadata = {
 // Applied before paint to avoid a flash of the wrong theme, and to arm the
 // livery motion. Gating .motion here (rather than in CSS) means that with JS
 // off — or with reduced motion asked for — the reveal styles never apply and
-// every section renders visible and static.
-const themeScript = `${appearanceScript}\n(function(){try{if(window.matchMedia('(prefers-reduced-motion: no-preference)').matches&&localStorage.getItem('wh-motion')!=='paused')document.documentElement.classList.add('motion');else document.documentElement.setAttribute('data-motion-paused','');}catch(e){}})();`;
+// every section renders visible and static. Depth is armed the same way, so
+// the first frame already has its dimension and nothing lurches forward.
+const themeScript = `${appearanceScript}\n(function(){try{if(window.matchMedia('(prefers-reduced-motion: no-preference)').matches&&localStorage.getItem('wh-motion')!=='paused')document.documentElement.classList.add('motion');else document.documentElement.setAttribute('data-motion-paused','');}catch(e){}})();\n${depthScript}`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

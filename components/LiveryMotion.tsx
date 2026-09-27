@@ -48,6 +48,104 @@ export default function LiveryMotion() {
     window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', onScroll);
 
+    // ── Pointer tilt ──────────────────────────────────────────────────
+    // One delegated listener writes the pointer's position within the hovered
+    // surface as --px/--py (-1..1), and within the enclosing scene as
+    // --sx/--sy; the CSS multiplies those by --depth. --tilt is the surface's
+    // angle budget: a fixed angle swings a wide panel's edges much further
+    // than a small card's, so wide surfaces get proportionally less. Flat, or
+    // with motion paused, nothing is written at all. Only fine pointers tilt —
+    // a touch drag should scroll, not rotate the card.
+    // Kept in step with the interactive-surface list in globals.css.
+    const TILT_TARGETS = 'a.subject-card, a.clay, a.clay-node, .featured-module, .depth-tilt';
+    const SCENES = '.home-hero, .depth-scene';
+    const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)');
+    let tilted: HTMLElement | null = null;
+    let scene: HTMLElement | null = null;
+    let tiltFrame = 0;
+    let lastEvent: PointerEvent | null = null;
+
+    const clearTilt = () => {
+      if (!tilted) return;
+      tilted.style.removeProperty('--px');
+      tilted.style.removeProperty('--py');
+      tilted.style.removeProperty('--tilt');
+      tilted = null;
+    };
+    const clearScene = () => {
+      if (!scene) return;
+      scene.style.removeProperty('--sx');
+      scene.style.removeProperty('--sy');
+      scene = null;
+    };
+    const clearAll = () => {
+      clearTilt();
+      clearScene();
+    };
+
+    const pointerIn = (el: HTMLElement, event: PointerEvent) => {
+      const r = el.getBoundingClientRect();
+      if (!r.width || !r.height) return null;
+      return {
+        r,
+        x: Math.max(-1, Math.min(1, ((event.clientX - r.left) / r.width) * 2 - 1)).toFixed(3),
+        y: Math.max(-1, Math.min(1, ((event.clientY - r.top) / r.height) * 2 - 1)).toFixed(3),
+      };
+    };
+
+    const applyTilt = () => {
+      tiltFrame = 0;
+      const event = lastEvent;
+      if (!event) return;
+      const from = event.target as Element | null;
+
+      const target = from?.closest<HTMLElement>(TILT_TARGETS) ?? null;
+      if (target !== tilted) clearTilt();
+      if (target) {
+        const p = pointerIn(target, event);
+        if (p) {
+          tilted = target;
+          target.style.setProperty('--px', p.x);
+          target.style.setProperty('--py', p.y);
+          target.style.setProperty('--tilt', Math.max(2.5, 8 * Math.min(1, 340 / Math.max(p.r.width, p.r.height))).toFixed(2));
+        }
+      }
+
+      const stage = from?.closest<HTMLElement>(SCENES) ?? null;
+      if (stage !== scene) clearScene();
+      if (stage) {
+        const p = pointerIn(stage, event);
+        if (p) {
+          scene = stage;
+          stage.style.setProperty('--sx', p.x);
+          stage.style.setProperty('--sy', p.y);
+        }
+      }
+    };
+
+    const onPointerMove = (event: PointerEvent) => {
+      if (!finePointer.matches) return;
+      if (!root.classList.contains('depth') || !root.classList.contains('motion')) {
+        clearAll();
+        return;
+      }
+      lastEvent = event;
+      if (!tiltFrame) tiltFrame = requestAnimationFrame(applyTilt);
+    };
+
+    window.addEventListener('pointermove', onPointerMove, { passive: true });
+    // A card scrolled out from under a stationary pointer must not stay tilted.
+    window.addEventListener('scroll', clearTilt, { passive: true });
+    document.addEventListener('pointerleave', clearAll);
+
+    const cleanTilt = () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('scroll', clearTilt);
+      document.removeEventListener('pointerleave', clearAll);
+      if (tiltFrame) cancelAnimationFrame(tiltFrame);
+      clearAll();
+    };
+
     // ── Reveal on entry ───────────────────────────────────────────────
     // If an observer is throttled, bypass only the entrance choreography.
     // This leaves the content visible without permanently disabling motion.
@@ -64,6 +162,7 @@ export default function LiveryMotion() {
       revealAll();
       return () => {
         cleanPreferences();
+        cleanTilt();
         window.removeEventListener('scroll', onScroll);
         window.removeEventListener('resize', onScroll);
         if (frame) cancelAnimationFrame(frame);
@@ -124,6 +223,7 @@ export default function LiveryMotion() {
 
     return () => {
       cleanPreferences();
+      cleanTilt();
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onScroll);
       if (frame) cancelAnimationFrame(frame);
