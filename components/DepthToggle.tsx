@@ -11,7 +11,7 @@ import HubIcon from './HubIcon';
 // A click swaps, with a one-shot camera move on the page; a sideways drag dials
 // the property by hand and settles on whichever side it is let go.
 
-const MORPH_MS = 1000;
+const MORPH_MS = 700;
 const SCRUB_PX = 120; // drag distance for a full swing between flat and 3D
 
 export default function DepthToggle() {

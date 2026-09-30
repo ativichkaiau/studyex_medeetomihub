@@ -109,9 +109,6 @@ body {
     background: repeating-linear-gradient(-45deg, var(--stripe-ink) 0 1px, transparent 1px 7px);
     opacity: 0.22;
   }
-  .motion .page-decoration::before {
-    animation: frame-breathe 9s ease-in-out infinite;
-  }
 
   .site-header {
     border-bottom: 1px solid var(--line);
@@ -542,9 +539,6 @@ body {
   .motion [data-reveal][data-revealed] .section-rule::after {
     transform: scaleX(1);
     transition: transform 760ms cubic-bezier(0.16, 1, 0.3, 1) 180ms;
-    background: linear-gradient(90deg, var(--line), var(--accent), var(--line));
-    background-size: 220% 100%;
-    animation: rule-scan 8s linear 900ms infinite;
   }
 
   /* Card grids stagger on mount, so they re-run when a tab swaps the
@@ -554,24 +548,24 @@ body {
     animation-delay: min(calc(var(--i, 0) * 55ms), 440ms);
   }
 
-  /* The hero flash: navy, then red, then yellow, sweeping in from the right. */
+  /* The hero flash: navy, then red, then yellow, sweeping in from the right.
+     The home hero is the one place anything keeps moving after arrival, and
+     even there it is a slow, shallow drift. */
   .motion .hero-stripes > span {
     animation:
       livery-sweep 900ms cubic-bezier(0.16, 1, 0.3, 1) backwards,
-      stripe-float 5s ease-in-out infinite;
+      stripe-float 10s ease-in-out infinite;
   }
   .motion .hero-stripes > span:nth-child(1) { animation-delay: 90ms, 900ms; }
   .motion .hero-stripes > span:nth-child(2) { animation-delay: 180ms, 1200ms; }
   .motion .hero-stripes > span:nth-child(3) { animation-delay: 260ms, 1500ms; }
 
   .motion .livery-slashes > span {
-    animation:
-      livery-slash-in 520ms cubic-bezier(0.16, 1, 0.3, 1) backwards,
-      slash-wave 4.5s ease-in-out infinite;
+    animation: livery-slash-in 520ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
   }
-  .motion .livery-slashes > span:nth-child(1) { animation-delay: 40ms, 1500ms; }
-  .motion .livery-slashes > span:nth-child(2) { animation-delay: 110ms, 1660ms; }
-  .motion .livery-slashes > span:nth-child(3) { animation-delay: 180ms, 1820ms; }
+  .motion .livery-slashes > span:nth-child(1) { animation-delay: 40ms; }
+  .motion .livery-slashes > span:nth-child(2) { animation-delay: 110ms; }
+  .motion .livery-slashes > span:nth-child(3) { animation-delay: 180ms; }
 
   /* The edge hatch drifts against the scroll. */
   .motion .page-decoration::after {
@@ -687,10 +681,7 @@ body {
   /* A page bar / modal stripe lays itself down as the surface arrives. */
   .motion .livery-stripe {
     transform-origin: left center;
-    background-size: 140% 100%;
-    animation:
-      livery-lay 560ms cubic-bezier(0.16, 1, 0.3, 1) backwards,
-      stripe-shift 8s linear 560ms infinite;
+    animation: livery-lay 560ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
   }
 
   /* The active year underline redraws itself each time it moves. */
@@ -789,9 +780,6 @@ body {
     translate: 0 -2px;
     box-shadow: 0 8px 18px -14px color-mix(in srgb, var(--accent) 50%, transparent);
   }
-  .motion .mechanism-arrow {
-    animation: arrow-pulse 3.6s ease-in-out infinite;
-  }
   .motion .quiz-list .quiz-item {
     animation: body-section-in 480ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
   }
@@ -814,32 +802,9 @@ body {
   .hero-traces > span:nth-child(1) { top: 34px; }
   .hero-traces > span:nth-child(2) { top: 54%; }
   .hero-traces > span:nth-child(3) { bottom: 12px; }
-  .motion .hero-traces > span { animation: track-pass 8s linear infinite; }
-  .motion .hero-traces > span:nth-child(2) { animation-delay: 2.5s; }
-  .motion .hero-traces > span:nth-child(3) { animation-delay: 5s; }
-
-  .motion .livery-progress::before {
-    content: "";
-    position: absolute;
-    inset: 0 auto 0 0;
-    z-index: 1;
-    width: 16%;
-    background: linear-gradient(90deg, transparent, var(--stripe-ink) 45%, var(--wm-red) 75%, var(--wm-yellow));
-    animation: timing-pass 6s ease-in-out infinite;
-  }
-  .motion .page-decoration::after {
-    animation: hatch-drift 3s linear infinite;
-  }
-  .motion .featured-module::after {
-    content: "";
-    position: absolute;
-    inset: 0 auto auto 0;
-    width: 30%;
-    height: 2px;
-    pointer-events: none;
-    background: linear-gradient(90deg, transparent, var(--accent), var(--wm-red), transparent);
-    animation: edge-pass 5s ease-in-out infinite;
-  }
+  .motion .hero-traces > span { animation: track-pass 16s linear infinite; }
+  .motion .hero-traces > span:nth-child(2) { animation-delay: 5s; }
+  .motion .hero-traces > span:nth-child(3) { animation-delay: 10s; }
 
   .motion :is(.primary-action, .clay-pill, .header-tool, .header-link, .library-mode, .subject-card, a.clay, a.clay-node) {
     transition-property: color, background-color, border-color, box-shadow, translate, scale;
@@ -849,16 +814,6 @@ body {
   .motion :is(.primary-action, button.clay-pill, a.clay-pill, .header-tool, .library-mode):active:not(:disabled) {
     scale: 0.96;
     translate: 0 1px;
-  }
-  .motion .primary-action::after {
-    content: "";
-    position: absolute;
-    inset: -50% auto -50% -60%;
-    width: 35%;
-    pointer-events: none;
-    background: linear-gradient(90deg, transparent, rgb(255 255 255 / 24%), transparent);
-    transform: skewX(-20deg);
-    animation: action-sheen 6.5s ease-in-out infinite;
   }
   .header-link::after {
     content: "";
@@ -876,12 +831,6 @@ body {
   }
   .motion .year-tab[aria-pressed="true"] {
     text-shadow: 0 0 18px color-mix(in srgb, var(--accent) 18%, transparent);
-  }
-  .motion .tutor-trigger > svg {
-    animation: tutor-twinkle 6s ease-in-out 2s infinite;
-  }
-  .motion .tutor-trigger {
-    animation: tutor-float 7s ease-in-out 1.8s infinite;
   }
   .motion .clay-inset:focus-within {
     border-color: var(--accent);
@@ -921,13 +870,7 @@ body {
 
 @keyframes stripe-float {
   0%, 100% { translate: 0 0; }
-  50% { translate: 0 20px; }
-}
-
-@keyframes slash-wave {
-  0%, 65%, 100% { translate: 0 0; scale: 1 1; }
-  78% { translate: 0 -4px; scale: 1 1.18; }
-  90% { translate: 0 1px; }
+  50% { translate: 0 8px; }
 }
 
 @keyframes track-pass {
@@ -936,32 +879,15 @@ body {
   85%, 100% { transform: translateX(600%); opacity: 0; }
 }
 
-@keyframes timing-pass {
-  0% { transform: translateX(-110%); opacity: 0; }
-  8%, 70% { opacity: 1; }
-  90%, 100% { transform: translateX(725%); opacity: 0; }
-}
-
 @keyframes hatch-drift {
   to { background-position: 20px 0; }
 }
 
-@keyframes edge-pass {
-  0%, 12% { transform: translateX(-110%); opacity: 0; }
-  25%, 70% { opacity: 1; }
-  85%, 100% { transform: translateX(440%); opacity: 0; }
-}
-
-@keyframes action-sheen {
-  0%, 55% { translate: 0 0; }
-  85%, 100% { translate: 520% 0; }
-}
-
-/* In depth, cards tip up out of the sheet. The depth terms vanish at
+/* In depth, cards tip up gently out of the sheet. The depth terms vanish at
    --depth: 0, leaving the flat rise exactly, and because the name never
    changes, swapping depth never replays an entrance that already ran. */
 @keyframes card-arrive {
-  from { opacity: 0; transform: perspective(900px) translate3d(0, 26px, calc(var(--depth) * -130px)) rotateX(calc(var(--depth) * 24deg)) scale(0.975); }
+  from { opacity: 0; transform: perspective(900px) translate3d(0, 26px, calc(var(--depth) * -36px)) rotateX(calc(var(--depth) * 8deg)) scale(0.975); }
   to { opacity: 1; transform: perspective(900px) translate3d(0, 0, 0) rotateX(0deg) scale(1); }
 }
 
@@ -971,31 +897,10 @@ body {
   100% { transform: none; }
 }
 
-@keyframes tutor-twinkle {
-  0%, 65%, 100% { rotate: 0deg; scale: 1; }
-  76% { rotate: 16deg; scale: 1.18; }
-  87% { rotate: -8deg; scale: 0.95; }
-}
-
-@keyframes frame-breathe {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 0.8; }
-}
-
 @keyframes node-pulse {
   0% { opacity: 0; transform: scale(0.65); }
   38% { opacity: 0.65; transform: scale(1.15); }
   100% { opacity: 0; transform: scale(1.45); }
-}
-
-@keyframes stripe-shift {
-  from { background-position: 0 0; }
-  to { background-position: 40% 0; }
-}
-
-@keyframes rule-scan {
-  from { background-position: 180% 0; }
-  to { background-position: -20% 0; }
 }
 
 @keyframes count-settle {
@@ -1004,28 +909,17 @@ body {
   100% { opacity: 1; transform: none; }
 }
 
-@keyframes tutor-float {
-  0%, 100% { translate: 0 0; }
-  50% { translate: 0 -3px; }
-}
-
 @keyframes body-section-in {
   from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: none; }
 }
 
-/* In depth, each step swings down into place like a flap (pivoting on its
-   top edge — see .mechanism-node in the depth block). Flat, the rise as ever. */
+/* In depth, each step tips down into place (pivoting on its top edge — see
+   .mechanism-node in the depth block). Flat, the rise as ever. */
 @keyframes mechanism-node-in {
-  from { opacity: 0; transform: perspective(520px) translateY(8px) rotateX(calc(var(--depth) * -80deg)) scale(0.96); }
-  70% { opacity: 1; transform: perspective(520px) translateY(-1px) rotateX(calc(var(--depth) * 9deg)) scale(1.01); }
+  from { opacity: 0; transform: perspective(520px) translateY(8px) rotateX(calc(var(--depth) * -22deg)) scale(0.96); }
+  70% { opacity: 1; transform: perspective(520px) translateY(-1px) rotateX(calc(var(--depth) * 3deg)) scale(1.01); }
   to { opacity: 1; transform: perspective(520px) translateY(0) rotateX(0deg) scale(1); }
-}
-
-@keyframes arrow-pulse {
-  0%, 62%, 100% { opacity: 0.45; translate: 0 0; }
-  74% { opacity: 0.95; translate: 2px 0; }
-  86% { opacity: 0.55; translate: 0 0; }
 }
 
 @keyframes livery-slide {
@@ -1219,7 +1113,7 @@ html[data-motion-paused] { scroll-behavior: auto; }
      arrives. */
   --px: 0;
   --py: 0;
-  --tilt: 8;
+  --tilt: 4;
   --sx: 0;
   --sy: 0;
 
@@ -1305,7 +1199,7 @@ html[data-depth-scrub] {
       transform: perspective(900px)
         rotateX(calc(var(--py) * var(--depth) * var(--tilt) * -1deg))
         rotateY(calc(var(--px) * var(--depth) * var(--tilt) * 1deg))
-        translateZ(calc(var(--depth) * 18px));
+        translateZ(calc(var(--depth) * 8px));
     }
     :root.depth.motion :is(a.subject-card, a.clay, a.clay-node, .featured-module):hover {
       box-shadow:
@@ -1360,11 +1254,12 @@ html[data-depth-scrub] {
   }
 
   /* ── Arrivals come out of the depth ──────────────────────────────────────
-     Block cards tip up out of the sheet (card-arrive), mechanism steps swing
-     down into place like flaps (mechanism-node-in), and sections travel
-     forward instead of only rising. Entrances keep one animation name in both
-     modes and fold --depth into their keyframes, so a swap never replays one
-     that already ran; each ends at the identity and leaves no transform. */
+     Kept deliberately shallow: block cards tip up a few degrees (card-arrive),
+     mechanism steps tip down into place (mechanism-node-in), and sections
+     come forward a short way as they rise. Entrances keep one animation name
+     in both modes and fold --depth into their keyframes, so a swap never
+     replays one that already ran; each ends at the identity and leaves no
+     transform. Pages themselves do not animate on navigation. */
   .mechanism-node {
     transform-origin: 50% calc((1 - var(--depth)) * 50%);
   }
@@ -1372,33 +1267,20 @@ html[data-depth-scrub] {
     transform-origin: 50% min(50%, 320px);
   }
   :root.depth.motion [data-reveal]:not([data-revealed]) {
-    transform: perspective(1200px) translate3d(0, 14px, calc(var(--depth) * -80px));
+    transform: perspective(1200px) translate3d(0, 14px, calc(var(--depth) * -28px));
   }
 
-  /* Whole pages arrive out of the depth on every navigation. At depth 0 the
-     keyframes resolve to the identity, so the flat design is untouched, and
-     because the rule matches in both modes, flipping depth never replays it. */
-  .motion main:not(.skeleton-stage) {
-    transform-origin: 50% 220px;
-    animation: page-arrive 780ms var(--depth-ease) backwards;
-  }
-
-  /* The swap itself: a one-shot camera move on the page plane while the
-     property travels. Rising, the sheet swings back so the layers can be seen
-     separating; flattening, it is pressed back into one plane. page-arrive
-     stays first in the list so the finished arrival is not replayed. The
-     pivot (--morph-oy) is the middle of the viewport, set by DepthToggle. */
+  /* The swap itself: a short, shallow camera move on the page plane while the
+     property travels — the sheet leans back a little as the layers separate,
+     or settles as they press flat. It runs only when you click the control.
+     The pivot (--morph-oy) is the middle of the viewport, set by DepthToggle. */
   .motion[data-depth-morph="rise"] main:not(.skeleton-stage) {
     transform-origin: 50% var(--morph-oy, 40vh);
-    animation:
-      page-arrive 780ms var(--depth-ease) backwards,
-      depth-rise 960ms cubic-bezier(0.45, 0, 0.2, 1);
+    animation: depth-rise 620ms cubic-bezier(0.45, 0, 0.2, 1);
   }
   .motion[data-depth-morph="flatten"] main:not(.skeleton-stage) {
     transform-origin: 50% var(--morph-oy, 40vh);
-    animation:
-      page-arrive 780ms var(--depth-ease) backwards,
-      depth-flatten 640ms cubic-bezier(0.45, 0, 0.2, 1);
+    animation: depth-flatten 480ms cubic-bezier(0.45, 0, 0.2, 1);
   }
 
   /* ── The page frame recedes ──────────────────────────────────────────────
@@ -1435,32 +1317,32 @@ html[data-depth-scrub] {
     color: var(--accent);
   }
 
-  /* ── Hero: the one theatrical scene ──────────────────────────────────────
+  /* ── Hero: the one scene ─────────────────────────────────────────────────
      A local stage (overflow clips it but does not cancel perspective). The
-     livery flash floats well in front, the timing traces sit far behind, and
-     the two drift against each other with the pointer. The headline stays on
-     the sheet at Z 0 so it never softens. */
+     livery flash floats in front and the timing traces sit behind; with the
+     pointer they drift apart only slightly. The headline stays on the sheet
+     at Z 0 so it never softens. */
   .home-hero {
     perspective: 1000px;
     perspective-origin: 80% 10%;
   }
   .hero-stripes {
     transform:
-      translate3d(calc(var(--sx) * var(--depth) * -22px), calc(var(--sy) * var(--depth) * -12px), calc(var(--depth) * 70px))
+      translate3d(calc(var(--sx) * var(--depth) * -8px), calc(var(--sy) * var(--depth) * -5px), calc(var(--depth) * 56px))
       skew(-24deg);
-    transition: transform 600ms var(--depth-ease);
+    transition: transform 700ms var(--depth-ease);
   }
   .hero-traces {
     transform:
-      translate3d(calc(var(--sx) * var(--depth) * 16px), calc(var(--sy) * var(--depth) * 9px), calc(var(--depth) * -120px))
-      scale(calc(1 + var(--depth) * 0.12));
-    transition: transform 800ms var(--depth-ease);
+      translate3d(calc(var(--sx) * var(--depth) * 6px), calc(var(--sy) * var(--depth) * 4px), calc(var(--depth) * -100px))
+      scale(calc(1 + var(--depth) * 0.1));
+    transition: transform 900ms var(--depth-ease);
   }
 
-  /* ── Overlays swing down out of the depth ───────────────────────────────── */
+  /* ── Overlays come forward out of the depth ─────────────────────────────── */
   :root.depth.motion .modal-panel {
     transform-origin: 50% 0;
-    animation: depth-emerge 460ms var(--depth-ease) backwards;
+    animation: depth-emerge 340ms var(--depth-ease) backwards;
   }
 
   /* ── Flashcards: the one literal 3D object ───────────────────────────────
@@ -1475,13 +1357,13 @@ html[data-depth-scrub] {
     perspective: 1600px;
   }
   .motion .card-deal {
-    animation: card-deal 580ms var(--depth-ease) backwards;
+    animation: card-deal 420ms var(--depth-ease) backwards;
   }
   .card-3d {
     display: grid;
     width: 100%;
     transform-style: preserve-3d;
-    transition: transform 720ms cubic-bezier(0.3, 0.85, 0.25, 1);
+    transition: transform 560ms cubic-bezier(0.3, 0.85, 0.25, 1);
   }
   .card-3d[data-face="back"] {
     transform: rotateY(calc(var(--depth) * 180deg));
@@ -1504,7 +1386,7 @@ html[data-depth-scrub] {
   .card-3d[data-face="front"] > .card-face-back,
   .card-3d[data-face="back"] > .card-face-front {
     opacity: 0;
-    transition: opacity 0s linear 720ms;
+    transition: opacity 0s linear 560ms;
   }
   :root:not(.depth) .card-3d[data-face] > .card-face {
     transition: opacity 260ms ease;
@@ -1517,19 +1399,18 @@ html[data-depth-scrub] {
   .motion .card-3d[data-face="back"] .card-rule {
     transform-origin: left center;
     animation: livery-lay 360ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
-    animation-delay: calc(var(--depth) * 320ms);
+    animation-delay: calc(var(--depth) * 240ms);
   }
   .motion .card-3d[data-face="back"] .card-answer {
     animation: livery-rise 420ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
-    animation-delay: calc(90ms + var(--depth) * 320ms);
+    animation-delay: calc(90ms + var(--depth) * 240ms);
   }
 
   /* ── Skeletons ───────────────────────────────────────────────────────────
      Every route ships its own skeleton, laid out like the page it stands in
-     for. In depth the whole layout lies on a sheet tipped back into the scene
-     — the same pose the real page arrives from, so the page stands up out of
-     its own skeleton — and its parts float above the sheet at their own
-     heights. These are the shared primitives; each route adds its own motif.
+     for. In depth the whole layout lies on a sheet tipped slightly back into
+     the scene, and its parts float above the sheet at their own heights.
+     These are the shared primitives; each route adds its own quiet motif.
      Flat, it is a plain placeholder in the page's shape. */
   .skeleton-stage {
     perspective: 1400px;
@@ -1538,12 +1419,10 @@ html[data-depth-scrub] {
   .sk-plane {
     transform-style: preserve-3d;
     transform-origin: 50% 190px;
-    transform: translate3d(0, 0, calc(var(--depth) * -90px)) rotateX(calc(var(--depth) * 8deg));
+    transform: translate3d(0, 0, calc(var(--depth) * -50px)) rotateX(calc(var(--depth) * 5deg));
   }
   .motion .sk-plane {
-    animation:
-      sk-plane-in 620ms var(--depth-ease) backwards,
-      sk-plane-drift 9s ease-in-out 620ms infinite;
+    animation: sk-plane-in 480ms var(--depth-ease) backwards;
   }
   .sk-plane :is(div, section, header, nav, aside, ul, ol, li, footer) {
     transform-style: preserve-3d;
@@ -1605,9 +1484,9 @@ html[data-depth-scrub] {
     content: "";
     position: absolute;
     inset: 0;
-    background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.55) 50%, transparent 80%);
+    background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.4) 50%, transparent 80%);
     transform: translateX(-100%);
-    animation: sk-sweep 1600ms ease-in-out infinite;
+    animation: sk-sweep 2400ms ease-in-out infinite;
     animation-delay: calc(var(--i, 0) * 60ms);
   }
   /* .dark and .motion both sit on <html>, so they compound. */
@@ -1616,31 +1495,32 @@ html[data-depth-scrub] {
   }
 
   /* Route motifs. Each skeleton opts into the movement that says what it is
-     waiting for. All of them ride on --depth, so flat they are still. */
+     waiting for — slow and shallow, or played once. All of them ride on
+     --depth, so flat they are still. */
   .motion .sk-wave > * {
-    animation: sk-bob 3.2s ease-in-out infinite;
-    animation-delay: calc(var(--i, 0) * -0.4s);
+    animation: sk-bob 5.6s ease-in-out infinite;
+    animation-delay: calc(var(--i, 0) * -0.6s);
   }
   .motion .sk-rise > * {
     transform-origin: 50% 100%;
-    animation: sk-rise 1.1s var(--depth-ease) backwards;
-    animation-delay: calc(var(--i, 0) * 110ms);
+    animation: sk-rise 800ms var(--depth-ease) backwards;
+    animation-delay: calc(var(--i, 0) * 90ms);
   }
   .motion .sk-flaps > * {
     transform-origin: 50% 0;
-    animation: sk-flap 2.6s cubic-bezier(0.45, 0, 0.2, 1) infinite;
-    animation-delay: calc(var(--i, 0) * 180ms);
+    animation: sk-flap 700ms var(--depth-ease) backwards;
+    animation-delay: calc(var(--i, 0) * 120ms);
   }
   .motion .sk-peel {
     transform-origin: 0% 100%;
-    animation: sk-peel 3.4s cubic-bezier(0.45, 0, 0.2, 1) infinite;
+    animation: sk-peel 5.6s cubic-bezier(0.45, 0, 0.2, 1) infinite;
   }
   .motion .sk-orbit > * {
-    animation: sk-orbit 7s ease-in-out infinite;
-    animation-delay: calc(var(--i, 0) * -1.1s);
+    animation: sk-orbit 11s ease-in-out infinite;
+    animation-delay: calc(var(--i, 0) * -1.6s);
   }
   .motion .sk-pull {
-    animation: sk-pull 3s cubic-bezier(0.45, 0, 0.2, 1) infinite;
+    animation: sk-pull 5.2s cubic-bezier(0.45, 0, 0.2, 1) infinite;
   }
   /* Cards fanned out behind the one on top — only in depth. */
   .sk-fan-card {
@@ -1652,7 +1532,7 @@ html[data-depth-scrub] {
       rotateZ(calc(var(--depth) * var(--r, 0) * 1deg));
   }
   .motion .sk-fan .sk-fan-card {
-    animation: sk-fan 4.4s ease-in-out infinite;
+    animation: sk-fan 7s ease-in-out infinite;
   }
   /* A bookmark ribbon hanging above a saved card. */
   .sk-ribbon {
@@ -1671,24 +1551,13 @@ html[data-depth-scrub] {
   }
 }
 
-@keyframes page-arrive {
-  from {
-    opacity: calc(1 - var(--depth) * 0.6);
-    transform: perspective(1400px) translate3d(0, 0, calc(var(--depth) * -90px)) rotateX(calc(var(--depth) * 8deg));
-  }
-  to {
-    opacity: 1;
-    transform: perspective(1400px) translate3d(0, 0, 0) rotateX(0deg);
-  }
-}
-
 @keyframes depth-rise {
   0%,
   100% {
     transform: perspective(1600px) translate3d(0, 0, 0) rotateX(0deg);
   }
   42% {
-    transform: perspective(1600px) translate3d(0, 0, -130px) rotateX(11deg);
+    transform: perspective(1600px) translate3d(0, 0, -48px) rotateX(4deg);
   }
 }
 
@@ -1698,14 +1567,14 @@ html[data-depth-scrub] {
     transform: perspective(1600px) translate3d(0, 0, 0) rotateX(0deg);
   }
   38% {
-    transform: perspective(1600px) translate3d(0, 0, -60px) rotateX(-3deg);
+    transform: perspective(1600px) translate3d(0, 0, -22px) rotateX(-1.2deg);
   }
 }
 
 @keyframes depth-emerge {
   from {
     opacity: 0;
-    transform: perspective(1200px) translate3d(0, -10px, calc(var(--depth) * -160px)) rotateX(calc(var(--depth) * -14deg));
+    transform: perspective(1200px) translate3d(0, -6px, calc(var(--depth) * -48px)) rotateX(calc(var(--depth) * -5deg));
   }
   to {
     opacity: 1;
@@ -1718,7 +1587,7 @@ html[data-depth-scrub] {
 @keyframes card-deal {
   from {
     opacity: calc(1 - var(--depth));
-    transform: perspective(1600px) translate3d(calc(var(--depth) * 70px), calc(var(--depth) * 12px), calc(var(--depth) * -180px)) rotateY(calc(var(--depth) * -18deg)) rotateZ(calc(var(--depth) * 3deg));
+    transform: perspective(1600px) translate3d(calc(var(--depth) * 22px), calc(var(--depth) * 6px), calc(var(--depth) * -56px)) rotateY(calc(var(--depth) * -6deg)) rotateZ(calc(var(--depth) * 1deg));
   }
   to {
     opacity: 1;
@@ -1735,17 +1604,7 @@ html[data-depth-scrub] {
 @keyframes sk-plane-in {
   from {
     opacity: 0;
-    transform: translate3d(0, 0, calc(var(--depth) * -200px)) rotateX(calc(var(--depth) * 18deg));
-  }
-}
-
-@keyframes sk-plane-drift {
-  0%,
-  100% {
-    transform: translate3d(0, 0, calc(var(--depth) * -90px)) rotateX(calc(var(--depth) * 8deg)) rotateY(0deg);
-  }
-  50% {
-    transform: translate3d(0, 0, calc(var(--depth) * -98px)) rotateX(calc(var(--depth) * 9.5deg)) rotateY(calc(var(--depth) * -1.4deg));
+    transform: translate3d(0, 0, calc(var(--depth) * -110px)) rotateX(calc(var(--depth) * 9deg));
   }
 }
 
@@ -1755,28 +1614,21 @@ html[data-depth-scrub] {
     transform: translateZ(calc(var(--depth) * var(--z, 10) * 1px));
   }
   50% {
-    transform: translateZ(calc(var(--depth) * (var(--z, 10) + var(--amp, 18)) * 1px));
+    transform: translateZ(calc(var(--depth) * (var(--z, 10) + var(--amp, 7)) * 1px));
   }
 }
 
 @keyframes sk-rise {
   from {
-    transform: translateZ(calc(var(--depth) * -40px)) scaleY(0.2);
+    transform: translateZ(calc(var(--depth) * -24px)) scaleY(0.4);
     opacity: 0;
   }
 }
 
+/* Played once: each option flips down into place and stays. */
 @keyframes sk-flap {
-  0%,
-  18% {
-    transform: translateZ(calc(var(--depth) * var(--z, 8) * 1px)) rotateX(calc(var(--depth) * -88deg));
-  }
-  34%,
-  82% {
-    transform: translateZ(calc(var(--depth) * var(--z, 8) * 1px)) rotateX(0deg);
-  }
-  100% {
-    transform: translateZ(calc(var(--depth) * var(--z, 8) * 1px)) rotateX(calc(var(--depth) * 88deg));
+  from {
+    transform: translateZ(calc(var(--depth) * var(--z, 8) * 1px)) rotateX(calc(var(--depth) * -70deg));
   }
 }
 
@@ -1788,7 +1640,7 @@ html[data-depth-scrub] {
   }
   55%,
   70% {
-    transform: translate3d(calc(var(--depth) * 26px), calc(var(--depth) * -18px), calc(var(--depth) * (var(--z, 24) + 60) * 1px)) rotateX(calc(var(--depth) * 10deg)) rotateZ(calc(var(--depth) * 4deg));
+    transform: translate3d(calc(var(--depth) * 10px), calc(var(--depth) * -6px), calc(var(--depth) * (var(--z, 24) + 22) * 1px)) rotateX(calc(var(--depth) * 4deg)) rotateZ(calc(var(--depth) * 1.5deg));
   }
 }
 
@@ -1798,10 +1650,10 @@ html[data-depth-scrub] {
     transform: translate3d(0, 0, calc(var(--depth) * var(--z, 20) * 1px));
   }
   33% {
-    transform: translate3d(calc(var(--depth) * 6px), calc(var(--depth) * -5px), calc(var(--depth) * (var(--z, 20) + 22) * 1px));
+    transform: translate3d(calc(var(--depth) * 3px), calc(var(--depth) * -2px), calc(var(--depth) * (var(--z, 20) + 9) * 1px));
   }
   66% {
-    transform: translate3d(calc(var(--depth) * -5px), calc(var(--depth) * 4px), calc(var(--depth) * (var(--z, 20) + 8) * 1px));
+    transform: translate3d(calc(var(--depth) * -2px), calc(var(--depth) * 2px), calc(var(--depth) * (var(--z, 20) + 4) * 1px));
   }
 }
 
@@ -1813,7 +1665,7 @@ html[data-depth-scrub] {
   }
   50%,
   75% {
-    transform: translate3d(calc(var(--depth) * 18px), 0, calc(var(--depth) * (var(--z, 20) + 46) * 1px)) rotateY(calc(var(--depth) * -8deg));
+    transform: translate3d(calc(var(--depth) * 8px), 0, calc(var(--depth) * (var(--z, 20) + 18) * 1px)) rotateY(calc(var(--depth) * -3deg));
   }
 }
 
@@ -1821,13 +1673,13 @@ html[data-depth-scrub] {
   0%,
   100% {
     transform:
-      translate3d(calc(var(--depth) * var(--fx, 0) * 0.7px), calc(var(--depth) * var(--fy, 0) * 1px), calc(var(--depth) * var(--z, -20) * 1px))
-      rotateZ(calc(var(--depth) * var(--r, 0) * 0.7deg));
+      translate3d(calc(var(--depth) * var(--fx, 0) * 0.9px), calc(var(--depth) * var(--fy, 0) * 1px), calc(var(--depth) * var(--z, -20) * 1px))
+      rotateZ(calc(var(--depth) * var(--r, 0) * 0.9deg));
   }
   50% {
     transform:
-      translate3d(calc(var(--depth) * var(--fx, 0) * 1.15px), calc(var(--depth) * var(--fy, 0) * 1px), calc(var(--depth) * var(--z, -20) * 1px))
-      rotateZ(calc(var(--depth) * var(--r, 0) * 1.15deg));
+      translate3d(calc(var(--depth) * var(--fx, 0) * 1.05px), calc(var(--depth) * var(--fy, 0) * 1px), calc(var(--depth) * var(--z, -20) * 1px))
+      rotateZ(calc(var(--depth) * var(--r, 0) * 1.05deg));
   }
 }
 

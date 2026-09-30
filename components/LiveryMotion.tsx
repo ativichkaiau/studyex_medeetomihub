@@ -107,7 +107,7 @@ export default function LiveryMotion() {
           tilted = target;
           target.style.setProperty('--px', p.x);
           target.style.setProperty('--py', p.y);
-          target.style.setProperty('--tilt', Math.max(2.5, 8 * Math.min(1, 340 / Math.max(p.r.width, p.r.height))).toFixed(2));
+          target.style.setProperty('--tilt', Math.max(1.5, 4 * Math.min(1, 340 / Math.max(p.r.width, p.r.height))).toFixed(2));
         }
       }
 

@@ -15,7 +15,7 @@ export default function Loading() {
               <div
                 key={n}
                 className="sk-card sk-stack sk-z flex flex-col gap-2 rounded-lg p-4"
-                style={{ '--z': 18, '--i': y * 3 + n, '--amp': 12 } as Vars}
+                style={{ '--z': 18, '--i': y * 3 + n, '--amp': 6 } as Vars}
               >
                 <div className="flex items-center gap-2">
                   <Bar w={34} h={10} className="sk-accent" />

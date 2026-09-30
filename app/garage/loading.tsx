@@ -22,7 +22,7 @@ export default function Loading() {
                 </div>
                 <Bar w={34} h={16} className="rounded" />
                 <div className="sk-wave">
-                  <span className="sk-ribbon sk-z" style={{ '--z': 34, '--i': n, '--amp': 16 } as Vars} />
+                  <span className="sk-ribbon sk-z" style={{ '--z': 34, '--i': n, '--amp': 8 } as Vars} />
                 </div>
               </div>
             ))}
