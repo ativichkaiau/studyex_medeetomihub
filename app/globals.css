@@ -1082,11 +1082,11 @@ html[data-motion-paused] { scroll-behavior: auto; }
    One registered custom property, --depth, drives everything. Every offset,
    angle and shadow below is a multiple of it, so --depth: 0 is the flat design
    exactly and --depth: 1 is the full dimensional treatment. Toggling the class
-   animates the property, so the interface travels between the two in place —
-   no reflow, no remount, scroll position and component state untouched.
-   Dragging the header control scrubs the same property by hand.
+   switches the whole interface in place — no reflow, no remount, scroll
+   position and component state untouched — and the header control dresses
+   the switch in a View Transition. Dragging it scrubs the property by hand.
 
-   Two rules keep it honest:
+   Three rules keep it honest (and fast):
    · Perspective only reaches an element's direct children. A surface that
      moves in Z therefore carries its own perspective() in its transform, and
      every multi-layer scene (hero, flashcard, skeleton) owns a local stage.
@@ -1094,6 +1094,9 @@ html[data-motion-paused] { scroll-behavior: auto; }
      shadow; transforms exist only while something moves — a hover, an
      arrival, a turn, the swap itself. The page never turns every card into a
      GPU layer, and prose stays rasterised crisp at its own scale.
+   · Nothing inherited changes on <html> per frame. --depth moves only on a
+     swap or a drag, and per-frame values (scroll progress, pointer position)
+     are written on the few elements that read them, never on the root.
    ══════════════════════════════════════════════════════════════════════════ */
 
 @property --depth {
@@ -1141,14 +1144,18 @@ html[data-motion-paused] { scroll-behavior: auto; }
   --depth: 1;
 }
 
-/* The morph itself. Animating a registered property is what makes this a
-   transition rather than a restyle. */
-html {
-  transition: --depth 720ms var(--depth-ease);
-}
-/* While the control is being dragged the property follows the hand directly. */
-html[data-depth-scrub] {
-  transition: none;
+/* --depth is inherited by every element, so it is never animated: a
+   transition on it would restyle the whole document on every frame. A swap
+   applies it in one frame and the motion is a View Transition ("The swap",
+   below). While a swap or a drag is under way, element transitions are
+   suspended, so hundreds of shadows do not each animate a repaint. */
+html[data-depth-swap] *,
+html[data-depth-swap] *::before,
+html[data-depth-swap] *::after,
+html[data-depth-scrub] *,
+html[data-depth-scrub] *::before,
+html[data-depth-scrub] *::after {
+  transition: none !important;
 }
 
 @layer components {
@@ -1200,6 +1207,8 @@ html[data-depth-scrub] {
         rotateX(calc(var(--py) * var(--depth) * var(--tilt) * -1deg))
         rotateY(calc(var(--px) * var(--depth) * var(--tilt) * 1deg))
         translateZ(calc(var(--depth) * 8px));
+      /* Track the pointer tightly; the slower ease is only for settling back. */
+      transition-duration: 240ms, 240ms, 240ms, 240ms, 240ms, 240ms, 90ms;
     }
     :root.depth.motion :is(a.subject-card, a.clay, a.clay-node, .featured-module):hover {
       box-shadow:
@@ -1209,7 +1218,7 @@ html[data-depth-scrub] {
     /* The featured panel's reveal transition is slow and delayed; answering
        the pointer must not be. */
     :root.depth.motion .featured-module[data-revealed]:hover {
-      transition-duration: 240ms;
+      transition-duration: 240ms, 90ms; /* opacity, transform */
       transition-delay: 0s;
     }
     /* A glint that follows the pointer across the surface — the cue that
@@ -1254,33 +1263,15 @@ html[data-depth-scrub] {
   }
 
   /* ── Arrivals come out of the depth ──────────────────────────────────────
-     Kept deliberately shallow: block cards tip up a few degrees (card-arrive),
-     mechanism steps tip down into place (mechanism-node-in), and sections
-     come forward a short way as they rise. Entrances keep one animation name
-     in both modes and fold --depth into their keyframes, so a swap never
-     replays one that already ran; each ends at the identity and leaves no
-     transform. Pages themselves do not animate on navigation. */
+     Kept to small elements and kept shallow: block cards tip up a few
+     degrees (card-arrive) and mechanism steps tip down into place
+     (mechanism-node-in). Entrances keep one animation name in both modes and
+     fold --depth into their keyframes, so a swap never replays one that
+     already ran; each ends at the identity and leaves no transform. Whole
+     sections rise exactly as they do flat — in depth they used to wait as
+     large 3D layers — and pages do not animate on navigation. */
   .mechanism-node {
     transform-origin: 50% calc((1 - var(--depth)) * 50%);
-  }
-  :root.depth.motion [data-reveal] {
-    transform-origin: 50% min(50%, 320px);
-  }
-  :root.depth.motion [data-reveal]:not([data-revealed]) {
-    transform: perspective(1200px) translate3d(0, 14px, calc(var(--depth) * -28px));
-  }
-
-  /* The swap itself: a short, shallow camera move on the page plane while the
-     property travels — the sheet leans back a little as the layers separate,
-     or settles as they press flat. It runs only when you click the control.
-     The pivot (--morph-oy) is the middle of the viewport, set by DepthToggle. */
-  .motion[data-depth-morph="rise"] main:not(.skeleton-stage) {
-    transform-origin: 50% var(--morph-oy, 40vh);
-    animation: depth-rise 620ms cubic-bezier(0.45, 0, 0.2, 1);
-  }
-  .motion[data-depth-morph="flatten"] main:not(.skeleton-stage) {
-    transform-origin: 50% var(--morph-oy, 40vh);
-    animation: depth-flatten 480ms cubic-bezier(0.45, 0, 0.2, 1);
   }
 
   /* ── The page frame recedes ──────────────────────────────────────────────
@@ -1427,13 +1418,12 @@ html[data-depth-scrub] {
   .sk-plane :is(div, section, header, nav, aside, ul, ol, li, footer) {
     transform-style: preserve-3d;
   }
+  /* A bar paints into the plane it sits on; only parts given a height (.sk-z)
+     become layers of their own. */
   .sk {
     display: block;
-    position: relative;
-    overflow: hidden;
     border-radius: 6px;
     background: var(--surface-muted);
-    transform: translateZ(calc(var(--depth) * 1px));
   }
   .sk-ink {
     background: color-mix(in srgb, var(--ink) 14%, var(--surface-muted));
@@ -1479,19 +1469,11 @@ html[data-depth-scrub] {
   .sk-stack::after {
     transform: translate3d(calc(var(--depth) * 14px), calc(var(--depth) * 14px), calc(var(--depth) * -28px));
   }
-  /* The sweep travels along the livery diagonal, and only when motion is on. */
-  .motion .sk::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.4) 50%, transparent 80%);
-    transform: translateX(-100%);
-    animation: sk-sweep 2400ms ease-in-out infinite;
-    animation-delay: calc(var(--i, 0) * 60ms);
-  }
-  /* .dark and .motion both sit on <html>, so they compound. */
-  .dark.motion .sk::after {
-    background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.07) 50%, transparent 80%);
+  /* One slow pulse on the whole stage says "loading". It is a single
+     compositor animation; the sweep it replaces was one animated layer per
+     bar, all inside the 3D scene. */
+  .motion .skeleton-stage {
+    animation: sk-pulse 1.8s ease-in-out infinite;
   }
 
   /* Route motifs. Each skeleton opts into the movement that says what it is
@@ -1551,26 +1533,6 @@ html[data-depth-scrub] {
   }
 }
 
-@keyframes depth-rise {
-  0%,
-  100% {
-    transform: perspective(1600px) translate3d(0, 0, 0) rotateX(0deg);
-  }
-  42% {
-    transform: perspective(1600px) translate3d(0, 0, -48px) rotateX(4deg);
-  }
-}
-
-@keyframes depth-flatten {
-  0%,
-  100% {
-    transform: perspective(1600px) translate3d(0, 0, 0) rotateX(0deg);
-  }
-  38% {
-    transform: perspective(1600px) translate3d(0, 0, -22px) rotateX(-1.2deg);
-  }
-}
-
 @keyframes depth-emerge {
   from {
     opacity: 0;
@@ -1592,12 +1554,6 @@ html[data-depth-scrub] {
   to {
     opacity: 1;
     transform: perspective(1600px) translate3d(0, 0, 0) rotateY(0deg) rotateZ(0deg);
-  }
-}
-
-@keyframes sk-sweep {
-  to {
-    transform: translateX(100%);
   }
 }
 
@@ -1680,6 +1636,79 @@ html[data-depth-scrub] {
     transform:
       translate3d(calc(var(--depth) * var(--fx, 0) * 1.05px), calc(var(--depth) * var(--fy, 0) * 1px), calc(var(--depth) * var(--z, -20) * 1px))
       rotateZ(calc(var(--depth) * var(--r, 0) * 1.05deg));
+  }
+}
+
+/* ── The swap ──────────────────────────────────────────────────────────────
+   A View Transition started by components/DepthToggle.tsx. The old and new
+   interfaces are two snapshots, so the move runs on the compositor at the
+   same cost however long the page is. Both snapshots make the same short
+   camera move while they cross-fade: rising, the sheet leans back a little
+   as the layers separate; flattening, it is pressed in; releasing a drag
+   just settles. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 440ms;
+  animation-timing-function: cubic-bezier(0.45, 0, 0.2, 1);
+}
+::view-transition-old(root) {
+  animation-name: vt-out;
+}
+::view-transition-new(root) {
+  animation-name: vt-in;
+}
+html[data-depth-swap="rise"]::view-transition-old(root) {
+  animation-name: vt-out, vt-rise;
+}
+html[data-depth-swap="rise"]::view-transition-new(root) {
+  animation-name: vt-in, vt-rise;
+}
+html[data-depth-swap="flatten"]::view-transition-old(root) {
+  animation-name: vt-out, vt-press;
+}
+html[data-depth-swap="flatten"]::view-transition-new(root) {
+  animation-name: vt-in, vt-press;
+}
+html[data-depth-swap="settle"]::view-transition-old(root),
+html[data-depth-swap="settle"]::view-transition-new(root) {
+  animation-duration: 220ms;
+}
+
+@keyframes vt-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes vt-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes vt-rise {
+  0%,
+  100% {
+    transform: perspective(1600px) translateZ(0) rotateX(0deg);
+  }
+  45% {
+    transform: perspective(1600px) translateZ(-40px) rotateX(3deg);
+  }
+}
+
+@keyframes vt-press {
+  0%,
+  100% {
+    transform: perspective(1600px) translateZ(0);
+  }
+  45% {
+    transform: perspective(1600px) translateZ(-18px);
+  }
+}
+
+@keyframes sk-pulse {
+  50% {
+    opacity: 0.62;
   }
 }
 

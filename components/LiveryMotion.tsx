@@ -34,12 +34,20 @@ export default function LiveryMotion() {
     };
 
     // ── Lap progress ──────────────────────────────────────────────────
+    // Written only on the two elements that read it. Set on <html> it was
+    // inherited by every element, so each scroll frame restyled the whole
+    // document — ~13ms a frame on a long lecture page (~80ms on the first
+    // scroll after load) — where two boxes cost ~0.5ms.
+    const progressTargets = [...document.querySelectorAll<HTMLElement>('.livery-progress, .page-decoration')];
     let frame = 0;
+    let lastProgress = '';
     const setProgress = () => {
       frame = 0;
       const max = root.scrollHeight - root.clientHeight;
-      const p = max > 0 ? Math.min(1, Math.max(0, root.scrollTop / max)) : 0;
-      root.style.setProperty('--scroll-progress', p.toFixed(4));
+      const p = (max > 0 ? Math.min(1, Math.max(0, root.scrollTop / max)) : 0).toFixed(4);
+      if (p === lastProgress) return;
+      lastProgress = p;
+      for (const el of progressTargets) el.style.setProperty('--scroll-progress', p);
     };
     const onScroll = () => {
       if (!frame) frame = requestAnimationFrame(setProgress);

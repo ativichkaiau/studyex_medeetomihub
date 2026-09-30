@@ -4,22 +4,31 @@ import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } f
 import { DEPTH_CHANGE_EVENT, DEPTH_KEY, depthEnabled } from '../lib/depth';
 import HubIcon from './HubIcon';
 
-// The live swap. Flipping this does not re-render the interface into a second
-// stylesheet — it moves one registered custom property, and every depth rule in
-// globals.css is expressed as a multiple of it, so the whole UI travels between
-// flat and three dimensions in place with scroll position and state intact.
-// A click swaps, with a one-shot camera move on the page; a sideways drag dials
-// the property by hand and settles on whichever side it is let go.
+// The live swap. Every depth rule in globals.css is a multiple of one custom
+// property, --depth, so the whole UI changes dimension in place with scroll
+// position and state intact.
+//
+// --depth is inherited by every element, so changing it restyles the whole
+// document (~13ms on a long lecture page). It is therefore never animated: a
+// swap applies it in a single frame, and the motion is a View Transition — the
+// browser crossfades a snapshot of the old interface into the new one on the
+// compositor, with a short camera move, at the same cost on any page. Where
+// View Transitions are missing, or motion is off, the swap is instant. A
+// sideways drag still dials the property by hand and settles with a short
+// crossfade when let go.
 
-const MORPH_MS = 700;
 const SCRUB_PX = 120; // drag distance for a full swing between flat and 3D
+
+type ViewTransitionDocument = Document & {
+  startViewTransition?: (update: () => void) => { ready: Promise<void>; finished: Promise<void> };
+};
 
 export default function DepthToggle() {
   const [enabled, setEnabled] = useState(false);
   const [reduced, setReduced] = useState(false);
   const drag = useRef<{ id: number; x: number; from: number; active: boolean } | null>(null);
   const swallowClick = useRef(false);
-  const morphTimer = useRef(0);
+  const swapToken = useRef(0);
 
   useEffect(() => {
     const preference = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -34,7 +43,6 @@ export default function DepthToggle() {
     return () => {
       preference.removeEventListener('change', sync);
       window.removeEventListener(DEPTH_CHANGE_EVENT, sync);
-      window.clearTimeout(morphTimer.current);
     };
   }, []);
 
@@ -49,23 +57,28 @@ export default function DepthToggle() {
     window.dispatchEvent(new CustomEvent(DEPTH_CHANGE_EVENT, { detail: { enabled: next } }));
   }
 
-  // The camera move pivots on the middle of the viewport, so the part of the
-  // page being looked at is what swings — not a point a long way below it.
-  function morph(next: boolean) {
+  // `kind` picks the camera move in globals.css ("The swap"); `prepare` runs
+  // inside the update, after the old interface has been captured.
+  function swap(next: boolean, kind: 'rise' | 'flatten' | 'settle', prepare?: () => void) {
     const root = document.documentElement;
-    const main = document.querySelector('main');
-    if (main) {
-      const top = main.getBoundingClientRect().top;
-      root.style.setProperty('--morph-oy', `${Math.round(window.innerHeight * 0.45 - top)}px`);
+    const apply = () => {
+      prepare?.();
+      commit(next);
+    };
+    const doc = document as ViewTransitionDocument;
+    if (!root.classList.contains('motion') || typeof doc.startViewTransition !== 'function') {
+      apply();
+      return;
     }
-    window.clearTimeout(morphTimer.current);
-    delete root.dataset.depthMorph;
-    void root.offsetWidth; // restart the move if a swap is already running
-    root.dataset.depthMorph = next ? 'rise' : 'flatten';
-    morphTimer.current = window.setTimeout(() => {
-      delete root.dataset.depthMorph;
-      root.style.removeProperty('--morph-oy');
-    }, MORPH_MS);
+    const token = ++swapToken.current;
+    root.dataset.depthSwap = kind;
+    const transition = doc.startViewTransition(apply);
+    const done = () => {
+      if (swapToken.current === token) delete root.dataset.depthSwap;
+    };
+    // A swap started mid-swap skips the first one; that is expected, not an error.
+    transition.ready.catch(() => {});
+    transition.finished.then(done, done);
   }
 
   function onPointerDown(event: ReactPointerEvent<HTMLButtonElement>) {
@@ -105,11 +118,11 @@ export default function DepthToggle() {
     swallowClick.current = true;
     const root = document.documentElement;
     const value = parseFloat(root.style.getPropertyValue('--depth'));
-    // Hand the property back to the class in the same frame, with the
-    // transition re-armed, so it glides from where the hand left it.
-    root.removeAttribute('data-depth-scrub');
-    root.style.removeProperty('--depth');
-    commit(Number.isFinite(value) ? value >= 0.5 : enabled);
+    // Hand the property back to the class, settling from where the hand left it.
+    swap(Number.isFinite(value) ? value >= 0.5 : enabled, 'settle', () => {
+      root.removeAttribute('data-depth-scrub');
+      root.style.removeProperty('--depth');
+    });
   }
 
   function onClick() {
@@ -118,8 +131,7 @@ export default function DepthToggle() {
       return;
     }
     const next = !enabled;
-    morph(next);
-    commit(next);
+    swap(next, next ? 'rise' : 'flatten');
   }
 
   const label = reduced
