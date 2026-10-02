@@ -1,4 +1,4 @@
-// WilliamsHub (M-8) — content + personal-layer data model.
+// studyex_medeetomihub (formerly WilliamsHub, M-8) — content + personal-layer data model.
 //
 // Design rule: lecture CONTENT is code (typed objects, version-controlled, no DB).
 // PERSONAL data (errors, quiz attempts, progress) lives in localStorage only.

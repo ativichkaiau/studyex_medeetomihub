@@ -7,15 +7,21 @@ import {
   savePodConnection,
   syncFromPod,
 } from '../../lib/sync/podConnector';
+import { logActivity } from '../../lib/user/eventLog';
+import { stamp } from '../../lib/time';
 
 const DEFAULT_ORIGIN = 'https://williamspod.vercel.app';
 
+type Status = { kind: 'idle' } | { kind: 'busy' } | { kind: 'ok'; text: string } | { kind: 'error'; text: string };
+
+// The WilliamsPod bridge: pull this user's runs from Pod's token-gated export
+// and queue their misses here. Configuration stays on this device.
 export default function PodConnectPanel() {
   const [baseUrl, setBaseUrl] = useState(DEFAULT_ORIGIN);
   const [token, setToken] = useState('');
   const [lastSync, setLastSync] = useState<string | null>(null);
-  const [status, setStatus] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [connected, setConnected] = useState(false);
+  const [status, setStatus] = useState<Status>({ kind: 'idle' });
   const [showConfig, setShowConfig] = useState(false);
 
   useEffect(() => {
@@ -23,6 +29,7 @@ export default function PodConnectPanel() {
     if (c) {
       setBaseUrl(c.baseUrl);
       setToken(c.token);
+      setConnected(true);
     } else {
       setShowConfig(true);
     }
@@ -32,90 +39,80 @@ export default function PodConnectPanel() {
   const sync = async () => {
     const conn = { baseUrl, token };
     savePodConnection(conn);
-    setBusy(true);
-    setStatus('Syncing…');
+    setConnected(Boolean(baseUrl && token));
+    setStatus({ kind: 'busy' });
     const r = await syncFromPod(conn);
-    setBusy(false);
     if (r.ok) {
-      setStatus(`✓ Synced ${r.attempts} run(s) → ${r.queued} new repair item(s).`);
+      setStatus({ kind: 'ok', text: `synced ${r.attempts} run(s) → ${r.queued} new repair item(s)` });
       setLastSync(new Date().toISOString());
-      if (r.queued > 0) setTimeout(() => window.location.reload(), 700);
+      if (r.queued > 0) {
+        logActivity({ type: 'repair.queue', ref: 'williamspod sync', n: r.queued });
+        setTimeout(() => window.location.reload(), 700);
+      }
     } else {
-      setStatus(`⚠ ${r.error}`);
+      setStatus({ kind: 'error', text: r.error ?? 'unknown error' });
     }
   };
 
   const tokenUrl = `${(baseUrl || DEFAULT_ORIGIN).replace(/\/+$/, '')}/api/sync/token`;
+  const busy = status.kind === 'busy';
 
   return (
-    <section className="clay clay-surface mb-4 p-5">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <span className="h-2.5 w-2.5 rounded-full bg-gradient-to-r from-emerald-500 to-sky-500" />
-          <h3 className="text-sm font-bold uppercase tracking-wide text-slate-700 dark:text-slate-200">
-            Connect WilliamsPod
-          </h3>
-        </div>
-        <div className="flex items-center gap-2">
-          {lastSync ? (
-            <span className="text-[11px] text-slate-400 dark:text-slate-500">
-              last sync {new Date(lastSync).toLocaleString()}
-            </span>
-          ) : null}
-          <button
-            type="button"
-            onClick={() => setShowConfig((s) => !s)}
-            className="clay-pill px-2.5 py-1 text-[11px] font-semibold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
-          >
-            {showConfig ? 'Hide' : 'Configure'}
-          </button>
-        </div>
-      </div>
-
-      {showConfig ? (
-        <div className="mb-3 space-y-2">
-          <label className="block">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              WilliamsPod origin
-            </span>
-            <input
-              value={baseUrl}
-              onChange={(e) => setBaseUrl(e.target.value)}
-              placeholder={DEFAULT_ORIGIN}
-              className="mt-1 w-full rounded-lg border border-black/10 bg-white/70 px-3 py-1.5 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-sky-300 dark:border-white/10 dark:bg-white/5 dark:text-slate-100"
-            />
-          </label>
-          <label className="block">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              Export token
-            </span>
-            <input
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-              placeholder="exp1.…"
-              className="mt-1 w-full rounded-lg border border-black/10 bg-white/70 px-3 py-1.5 font-mono text-xs text-slate-800 outline-none focus:ring-2 focus:ring-sky-300 dark:border-white/10 dark:bg-white/5 dark:text-slate-100"
-            />
-          </label>
-          <p className="text-[11px] text-slate-500 dark:text-slate-400">
-            Get your token: log into WilliamsPod, then open{' '}
-            <a href={tokenUrl} target="_blank" rel="noreferrer" className="underline decoration-dotted underline-offset-2 hover:text-sky-600">
-              {tokenUrl}
-            </a>{' '}
-            and copy the <code className="rounded bg-black/5 px-1 dark:bg-white/10">token</code> value.
-          </p>
-        </div>
-      ) : null}
-
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={sync}
-          disabled={busy || !token}
-          className="clay-pill px-4 py-1.5 text-xs font-bold text-[#1e5bd6] transition active:translate-y-px disabled:opacity-40 dark:text-[#7AA0FF]"
-        >
-          {busy ? 'Syncing…' : '⤓ Sync now'}
+    <section className="panel mb-8" aria-labelledby="sync-source">
+      <div className="panel-head">
+        <span id="sync-source" className="panel-title">
+          sync_source: williamspod
+        </span>
+        <button type="button" onClick={() => setShowConfig((s) => !s)} className="btn btn-ghost btn-sm normal-case tracking-normal" aria-expanded={showConfig}>
+          {showConfig ? 'hide config' : 'configure'}
         </button>
-        {status ? <span className="text-xs text-slate-500 dark:text-slate-400">{status}</span> : null}
+      </div>
+      <div className="p-4">
+        <dl className="kv">
+          <dt>status</dt>
+          <dd>{connected ? <span className="text-ok">configured</span> : <span className="dim">not configured</span>}</dd>
+          <dt>origin</dt>
+          <dd className="truncate">{baseUrl || '—'}</dd>
+          <dt>last_sync</dt>
+          <dd>{lastSync ? stamp(lastSync) : <span className="dim">never</span>}</dd>
+        </dl>
+
+        {showConfig ? (
+          <div className="mt-5 grid gap-3 border-t border-line pt-4">
+            <label className="grid gap-1.5">
+              <span className="label">origin</span>
+              <input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder={DEFAULT_ORIGIN} className="input" spellCheck={false} />
+            </label>
+            <label className="grid gap-1.5">
+              <span className="label">export token</span>
+              <input value={token} onChange={(e) => setToken(e.target.value)} placeholder="exp1.…" className="input" spellCheck={false} autoComplete="off" />
+            </label>
+            <p className="font-mono text-[11px] leading-5 text-fg-3">
+              # token: log into WilliamsPod, open{' '}
+              <a href={tokenUrl} target="_blank" rel="noreferrer" className="xref">
+                {tokenUrl}
+              </a>{' '}
+              and copy the <code className="text-fg-2">token</code> value.
+            </p>
+          </div>
+        ) : null}
+
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <button type="button" onClick={sync} disabled={busy || !token} className="btn btn-primary">
+            {busy ? 'syncing…' : 'sync now'}
+          </button>
+          {status.kind === 'ok' ? <span className="font-mono text-[12px] text-ok">✓ {status.text}</span> : null}
+        </div>
+        {status.kind === 'error' ? (
+          <div className="mt-4 border-l-2 border-danger bg-raised px-3 py-2 font-mono text-[12px]">
+            <p className="text-danger">SYNC_FAILED</p>
+            <p className="mt-1 text-fg-2">{status.text}</p>
+            <p className="mt-1 text-fg-3">local state preserved.</p>
+            <button type="button" onClick={sync} className="cmd mt-2">
+              retry <span className="cmd-arrow">→</span>
+            </button>
+          </div>
+        ) : null}
       </div>
     </section>
   );

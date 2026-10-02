@@ -1,12 +1,21 @@
 import Link from 'next/link';
-import type { CSSProperties } from 'react';
 import { notFound, permanentRedirect } from 'next/navigation';
 import { lectureSets, lectureSetBySlug, lectureSetRedirects, subjectOfSource, subjectSlug, subjectByCode, referenceFrameworkByCode } from '../../../content';
 import LectureBody from '../../../components/LectureBody';
 import ActiveIntegrationPanel from '../../../components/ActiveIntegrationPanel';
 import ConceptModeController from '../../../components/concept/ConceptModeController';
+import DocIndex from '../../../components/DocIndex';
+import Page from '../../../components/ui/Page';
+import Meta from '../../../components/ui/Meta';
+import Cmd from '../../../components/ui/Cmd';
+import { SeenCount, SeenMarker } from '../../../components/library/Seen';
 import { onePagerForModule } from '../../../lib/concept/onepagerForModule';
-import { lectureTheme } from '../../../lib/theme';
+import { getModuleBank } from '../../../lib/questions/bank';
+import { lectureCode, lectureName, pad2, snake } from '../../../lib/paths';
+import type { Crumb } from '../../../lib/paths';
+
+// Every valid page is generated at build time; anything else is a real 404.
+export const dynamicParams = false;
 
 export function generateStaticParams() {
   return lectureSets.map((s) => ({ set: s.slug }));
@@ -14,9 +23,11 @@ export function generateStaticParams() {
 
 export function generateMetadata({ params }: { params: { set: string } }) {
   const s = lectureSetBySlug[lectureSetRedirects[params.set] ?? params.set];
-  return { title: s ? `${s.source} — WilliamsHub` : 'WilliamsHub' };
+  return { title: s ? s.source : 'lecture' };
 }
 
+// The whole lecture on one scroll — the primary study view. Every module in
+// full, in order, each with its own concept-mode switch.
 export default function LectureSetPage({ params }: { params: { set: string } }) {
   const redirect = lectureSetRedirects[params.set];
   if (redirect) permanentRedirect(`/lecture-set/${redirect}`);
@@ -26,100 +37,118 @@ export default function LectureSetPage({ params }: { params: { set: string } }) 
   const subjectCode = subjectOfSource[set.source];
   const subject = subjectCode ? subjectByCode[subjectCode] : undefined;
   const framework = subjectCode ? referenceFrameworkByCode[subjectCode] : undefined;
-  const theme = lectureTheme(set.source);
+  const unit = subject?.yearLabel === 'Reference' ? 'chapter' : 'lecture';
+  const code = lectureCode(set.source);
+  const ids = set.items.map((l) => l.id);
+  const traps = set.items.reduce((n, l) => n + l.traps.length, 0);
+  const questions = set.items.reduce((n, l) => n + getModuleBank(l.id).length, 0);
+
+  const crumbs: Crumb[] = [
+    { label: 'library', href: '/library' },
+    ...(subjectCode ? [{ label: subjectCode, href: `/subject/${subjectSlug(subjectCode)}` }] : []),
+    { label: code },
+  ];
 
   return (
-    <main className="mx-auto max-w-3xl px-5 py-8">
-      <nav
-        aria-label="Breadcrumb"
-        className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-400 dark:text-slate-500"
-      >
-        <Link href="/" className="transition hover:text-slate-700 dark:hover:text-slate-200">
-          All blocks
-        </Link>
-        {subjectCode ? (
-          <>
-            <span aria-hidden className="text-slate-300 dark:text-slate-600">
-              ›
-            </span>
-            <Link
-              href={`/subject/${subjectSlug(subjectCode)}`}
-              className="font-semibold text-[#1e5bd6] transition hover:underline dark:text-[#7AA0FF]"
-            >
-              {subjectCode}
-              {subject?.name ? ` — ${subject.name}` : ''}
-            </Link>
-            {subject?.year ? (
-              <span className="clay-pill px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-300">
-                {subject.yearLabel}
+    <Page crumbs={crumbs} width="max-w-[1060px]" aside={<SeenCount ids={ids} label="seen " />}>
+      <SeenMarker />
+      <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_200px] xl:gap-12">
+        <article className="min-w-0">
+          <header className="mb-10">
+            <div className="kicker">
+              <strong>{unit}</strong>
+              <span>{[subjectCode, code].filter(Boolean).join('/')}</span>
+              <span>·</span>
+              <span>
+                {set.items.length} module{set.items.length === 1 ? '' : 's'}
               </span>
-            ) : null}
-          </>
-        ) : null}
-      </nav>
-
-      {/* Header */}
-      <header className="mb-6 mt-4" data-reveal>
-        <div className={`mb-4 h-1.5 w-full rounded-full bg-gradient-to-r ${theme.grad}`} />
-        <div className="flex items-center gap-2.5">
-          <span className={`h-3.5 w-3.5 rounded-full ${theme.dot}`} />
-          <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white">{set.source}</h1>
-          <span className={`clay-pill px-2.5 py-0.5 text-xs font-semibold ${theme.text}`}>{set.items.length} topics</span>
-        </div>
-        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-          All {subject?.yearLabel === 'Reference' ? 'chapter' : 'lecture'} study modules on one scroll. Jump to a topic below.
-        </p>
-        {framework ? <p className="mt-2 text-xs leading-5 text-[var(--muted)]">Original study notes aligned to {framework.source}. Selected core concepts; read alongside the source chapter.</p> : null}
-
-        <Link
-          href={`/practice/lecture/${params.set}`}
-          className="clay-pill mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-[#1e5bd6] transition active:translate-y-px dark:text-[#7AA0FF]"
-        >
-          <span aria-hidden>📝</span> Practise this {subject?.yearLabel === 'Reference' ? 'chapter' : 'lecture'}
-        </Link>
-
-        {/* Jump nav */}
-        <nav className="mt-4 flex flex-wrap gap-2">
-          {set.items.map((l) => (
-            <a
-              key={l.id}
-              href={`#${l.id}`}
-              className={`clay-pill px-3 py-1.5 text-xs font-semibold transition active:translate-y-px ${theme.text}`}
-            >
-              {l.title}
-            </a>
-          ))}
-        </nav>
-      </header>
-
-      {/* Each topic in full */}
-      <div className="space-y-12">
-        {set.items.map((l, i) => (
-          <section key={l.id} id={l.id} className="scroll-mt-24" data-reveal style={{ '--reveal-i': i } as CSSProperties}>
-            <div className={`mb-3 h-1 w-16 rounded-full bg-gradient-to-r ${theme.grad}`} />
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-              <h2 className="flex items-center gap-2 text-2xl font-black tracking-tight text-slate-900 dark:text-white">
-                <span className={`h-3 w-3 rounded-full ${theme.dot}`} />
-                {l.title}
-              </h2>
-              <Link
-                href={`/lecture/${l.id}`}
-                className={`clay-pill px-3 py-1.5 text-xs font-bold transition active:translate-y-px ${theme.text}`}
-              >
-                Open full module →
-              </Link>
             </div>
-            <ConceptModeController lecture={l} onePager={onePagerForModule(l)}>
-              <LectureBody lecture={l} />
-            </ConceptModeController>
-            <ActiveIntegrationPanel moduleId={l.id} />
-          </section>
-        ))}
-      </div>
+            <h1 className="page-title">{lectureName(set.source)}</h1>
+            <p className="page-lede">
+              Every module of this {unit} on one scroll, in order. Switch a module&apos;s view to drill a single angle.
+              {framework ? ` Original study notes aligned to ${framework.source}; read alongside the source chapter.` : ''}
+            </p>
+            <Meta
+              className="mt-5"
+              rows={[
+                ...(subjectCode
+                  ? ([
+                      [
+                        'block',
+                        <Link key="b" href={`/subject/${subjectSlug(subjectCode)}`} className="xref">
+                          {subjectCode}
+                          {subject?.name ? ` — ${subject.name}` : ''}
+                        </Link>,
+                      ],
+                    ] as [string, React.ReactNode][])
+                  : []),
+                [unit, `${code} — ${lectureName(set.source)}`],
+                ['modules', String(set.items.length)],
+                ['exam_traps', String(traps)],
+                ['questions', questions.toLocaleString('en-US')],
+                ['seen', <SeenCount key="s" ids={ids} />],
+              ]}
+            />
+            <div className="mt-6 flex flex-wrap gap-2">
+              <Link href={`/practice/lecture/${params.set}`} className="btn btn-primary">
+                run practice <span aria-hidden="true">→</span>
+              </Link>
+              {subjectCode ? (
+                <Link href={`/flashcards/block/${subjectSlug(subjectCode)}`} className="btn">
+                  {subjectCode} cards <span aria-hidden="true">→</span>
+                </Link>
+              ) : null}
+            </div>
 
-      <footer className="mt-12 text-center text-xs text-slate-400 dark:text-slate-500" data-reveal>
-        WilliamsHub · M-8 · a VESTRIPPN3.0 satellite
-      </footer>
-    </main>
+            <nav aria-label="Modules in this lecture" className="mt-8 xl:hidden">
+              <p className="label mb-2">modules</p>
+              <ol className="tree">
+                {set.items.map((l, i) => (
+                  <li key={l.id}>
+                    <a href={`#${l.id}`} className="tree-row gap-2 pr-2" data-mid={l.id}>
+                      <span className="tree-glyph">{i === set.items.length - 1 ? '└──' : '├──'}</span>
+                      <span className="seen-dot" aria-hidden="true" />
+                      <span className="font-sans text-[13.5px] text-fg">{l.title}</span>
+                    </a>
+                  </li>
+                ))}
+              </ol>
+            </nav>
+          </header>
+
+          <div className="grid gap-16">
+            {set.items.map((l, i) => (
+              <section key={l.id} id={l.id} data-toc={snake(l.id)} aria-labelledby={`${l.id}--title`} className="min-w-0">
+                <div className="mb-6 flex flex-wrap items-end justify-between gap-x-6 gap-y-2 border-t border-line-strong pt-7">
+                  <div className="min-w-0">
+                    <p className="kicker">
+                      <span>
+                        module {pad2(i + 1)}/{pad2(set.items.length)}
+                      </span>
+                      <span>·</span>
+                      <span className="normal-case tracking-normal">{snake(l.id)}</span>
+                    </p>
+                    <h2 id={`${l.id}--title`} className="mt-2 text-[22px] font-semibold leading-tight tracking-[-0.015em] text-fg">
+                      {l.title}
+                    </h2>
+                  </div>
+                  <Cmd href={`/lecture/${l.id}`}>open module</Cmd>
+                </div>
+                <ConceptModeController lecture={l} onePager={onePagerForModule(l)}>
+                  <LectureBody lecture={l} />
+                </ConceptModeController>
+                <ActiveIntegrationPanel moduleId={l.id} compact />
+              </section>
+            ))}
+          </div>
+        </article>
+
+        <aside className="hidden xl:block" aria-label="Lecture index">
+          <div className="sticky top-[calc(var(--pathbar-h)+28px)]">
+            <DocIndex title="modules" />
+          </div>
+        </aside>
+      </div>
+    </Page>
   );
 }

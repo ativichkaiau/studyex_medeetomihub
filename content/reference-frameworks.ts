@@ -21,7 +21,7 @@ export interface ReferenceFramework {
   chapters: ReferenceFrameworkChapter[];
 }
 
-// Chapters follow the source contents; the five study units are WilliamsHub's
+// Chapters follow the source contents; the five study units are studyex_medeetomihub's
 // editorial grouping. Availability is derived from registered study modules.
 export const robbinsBasicPathologyFramework: ReferenceFramework = {
   code: 'RBP',
@@ -29,7 +29,7 @@ export const robbinsBasicPathologyFramework: ReferenceFramework = {
   edition: 'Ninth edition · ©2013',
   source: 'Robbins Basic Pathology, 9th ed. (©2013)',
   description:
-    'The book’s 23 chapters, arranged into five WilliamsHub study units. Start with general mechanisms of disease, then follow them into organ-system pathology. These study units are an editorial grouping, not units from the textbook.',
+    'The book’s 23 chapters, arranged into five studyex_medeetomihub study units. Start with general mechanisms of disease, then follow them into organ-system pathology. These study units are an editorial grouping, not units from the textbook.',
   units: [
     {
       id: 'general-pathology',

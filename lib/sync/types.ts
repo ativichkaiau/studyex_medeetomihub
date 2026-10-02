@@ -1,4 +1,4 @@
-// WilliamsSync — the contract by which WilliamsPod telemetry reaches WilliamsHub.
+// WilliamsSync — the contract by which WilliamsPod telemetry reaches the Hub (studyex_medeetomihub).
 // Types only; the client ingestion service is in williamsSync.ts and the (future)
 // server endpoint is app/api/williamssync/route.ts. Kept intentionally small.
 

@@ -1,6 +1,6 @@
 // WilliamsSync ingestion endpoint — PLACEHOLDER / SCAFFOLD.
 //
-// WilliamsHub is static and zero-backend, so telemetry is ingested CLIENT-SIDE by
+// The Hub (studyex_medeetomihub) is static and zero-backend, so telemetry is ingested CLIENT-SIDE by
 // lib/sync/williamsSync.ts into localStorage. This route exists so a future
 // multi-device backend (Supabase/Postgres — see prisma/schema.prisma) can drop in
 // without changing the WilliamsSyncEnvelope contract or any callers. It validates
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
       kind: env.kind,
       accepted: true,
       persisted: false,
-      note: 'Scaffold only — WilliamsHub ingests client-side into localStorage. Wire a backend to persist.',
+      note: 'Scaffold only — studyex_medeetomihub ingests client-side into localStorage. Wire a backend to persist.',
     },
     { status: 202 },
   );

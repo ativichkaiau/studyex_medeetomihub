@@ -1,52 +1,56 @@
-# WilliamsHub (M-8)
+# studyex_medeetomihub
 
-A **VEStriPPN satellite**. WilliamsHub turns actual MedCMU lectures into high-yield,
-mechanism-driven, exam-focused interactive study pages. It **supplements OnePagers — it does
-not replace them.** The aim: turn UI/UX + web dev into an academic performance engine, so that
-studying becomes building and building becomes studying.
+A VESTRIPPN satellite for MedCMU study: a lecture index, recall engine, exam-trap database and OnePager archive. Previously WilliamsHub. The study layer supplements your OnePagers.
 
-> **Priority order (every trade-off resolves in this order):**
-> correctness → lecture alignment → active recall → mechanism clarity → exam usefulness → UI beauty.
-> Avoid *beautiful procrastination*.
+Correctness, lecture alignment and active recall come before visual presentation. Medical content remains in typed, version-controlled modules; saved modules, notes, quiz results and activity stay on the current device.
 
-See [DESIGN.md](DESIGN.md) for the full information architecture, schema, and feature roadmap.
+## Run locally
 
-## Content library — 14 modules across lectures L1–L4
+```sh
+npm ci
+npm run dev
+```
 
-**L1 — Cardiac Arrhythmias**
-- Atrioventricular (AV) Block
-- Atrial Fibrillation
-- Atrial Flutter
-- Premature Contractions (PAC & PVC)
-- Ventricular Tachycardia (VT)
-- Ventricular Fibrillation (VF)
+The app uses Next.js 14, React 18, TypeScript, Tailwind and locally bundled Geist fonts. The tutor API requires a server-side OpenAI key; browsing, recall, cards and practice work without it.
 
-**L2 — Abnormal ECG**
-- STEMI Localization & Reciprocal Changes
-- Bundle Branch Block (RBBB vs LBBB)
-- Escape Rhythms & Sinus Node Dysfunction
+## Navigation
 
-**L3 — Congenital Heart Disease**
-- Ventricular Septal Defect (VSD)
-- Atrial Septal Defect (ASD)
-- Patent Ductus Arteriosus (PDA)
-- Tetralogy of Fallot (TOF)
+| Route | Purpose |
+| --- | --- |
+| `/` | Overview, recent context and index counts |
+| `/library` | Curriculum blocks, filtered by year |
+| `/library/onepagers` | External OnePager folders |
+| `/subject/[code]` | A block's lectures or reference chapters |
+| `/lecture-set/[set]` | Modules within a lecture |
+| `/lecture/[id]` | Recall-first module, mechanisms, quiz and notes |
+| `/flashcards` | Recall decks by block or module |
+| `/practice` | Question sessions by block, lecture or module |
+| `/progress` | Local coverage, accuracy and activity |
+| `/saved` | Saved modules and notes |
+| `/repair` | Weak topics and optional WilliamsPod connection |
 
-**L4 — Antiarrhythmic Drugs**
-- Antiarrhythmic Drugs (Vaughan-Williams)
+Historical `/garage` and `/standings` links redirect to `/saved` and `/progress`. Existing `wh-*` storage keys remain compatible with the previous interface.
 
-Each module carries: high-yield summary · mechanism chain · physical-exam findings ·
-investigations · treatment logic · mnemonics · an exam **trap card** (the "what question
-*category* is this?" defense) · and an active-recall quiz item.
+Use **⌘K / Ctrl+K** or **/** to search, **⌘J / Ctrl+J** to open the tutor, and **?** for the keyboard reference. Search also accepts commands beginning with `>`. Single-key navigation stays out of text fields and active study sessions.
 
-## Architecture
+## Appearance and accessibility
 
-- **Content is code** — one typed `Lecture` object per disease in
-  [`content/lectures/`](content/lectures), schema in [`lib/types.ts`](lib/types.ts).
-- **Personal data** (error log, quiz attempts, progress) → `localStorage` (no backend, offline-first).
-- Planned app: **Next.js + TypeScript + Tailwind**, static, recall-first UI for iPad/Mac.
+The technical shell uses a fixed desktop sidebar, a mobile navigation drawer, structural breadcrumbs and a reading-progress rule. Mono type identifies paths, counts and controls; lesson prose uses sans-serif type.
 
-## Status
+Auto appearance follows local time: light from 06:00 to 18:00, dark otherwise. Manual light/dark and motion choices persist when storage is available. System reduced motion always takes precedence. Dialogs contain focus, support Escape and restore keyboard focus; recall-gated content becomes available to assistive technology only after reveal.
 
-- ✅ Content library complete for L1–L4 (14 modules, registered in [`content/index.ts`](content/index.ts)).
-- ⏳ Next.js app scaffold (`/lecture/[id]` page + components) — pending.
+The brand is defined in `lib/brand.ts`, design tokens in `app/globals.css`, and current UI structure in [docs/redesign.md](docs/redesign.md). [DESIGN.md](DESIGN.md) preserves the original pedagogical brief.
+
+## Verification
+
+```sh
+npx tsc --noEmit --incremental false
+npm run appearance:verify
+npm run motion:verify
+npm run content:verify
+npm run build
+```
+
+The production build runs the preference and content checks, regenerates the search index, then prerenders the study routes. Content verification reports existing placement warnings separately from integrity errors. `npm run lint` requires an ESLint configuration and dependencies, which are not currently included.
+
+After a build, `npm start` serves the production bundle. Verify desktop and phone layouts, search, theme persistence, recall/reveal, practice, saved notes and legacy redirects before release. AI responses and WilliamsPod synchronization require their respective external services.

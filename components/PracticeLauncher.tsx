@@ -4,72 +4,54 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { getRepairQueue } from '../lib/repair/store';
 import { getVisited } from '../lib/user/activity';
+import { loadSearchIndex, moduleEntries, type IndexEntry } from '../lib/searchIndex';
+import { snake } from '../lib/paths';
 
-interface Entry {
-  k: string;
-  t: string;
-  id?: string;
-}
-
-function Row({
-  label,
-  color,
-  ids,
-  titleOf,
-}: {
-  label: string;
-  color: 'red' | 'blue';
-  ids: string[];
-  titleOf: (id: string) => string;
-}) {
+function Targets({ label, tone, ids, byId }: { label: string; tone: 'danger' | 'accent'; ids: string[]; byId: Record<string, IndexEntry> }) {
   if (ids.length === 0) return null;
-  const dot = color === 'red' ? 'bg-[#e4002b]' : 'bg-[var(--accent)]';
-  const text = color === 'red' ? 'text-[#e4002b] dark:text-[#ff5a72]' : 'text-[var(--accent)]';
   return (
-    <div>
-      <div className="mb-2 flex items-center gap-2">
-        <span className={`h-2 w-2 rounded-full ${dot}`} />
-        <h3 className={`text-xs font-semibold uppercase tracking-[0.1em] ${text}`}>{label}</h3>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {ids.map((id) => (
-          <Link key={id} href={`/practice/${id}`} className="clay-pill px-3 py-1.5 text-xs font-medium text-[var(--ink)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]">
-            {titleOf(id)}
-          </Link>
+    <div className="p-4">
+      <p className={`label mb-2 ${tone === 'danger' ? 'text-danger' : ''}`}>{label}</p>
+      <ul className="tree">
+        {ids.map((id, i) => (
+          <li key={id}>
+            <Link href={`/practice/${id}`} className="tree-row gap-2 pr-2">
+              <span className="tree-glyph">{i === ids.length - 1 ? '└──' : '├──'}</span>
+              <span className="min-w-0 flex-1 truncate font-sans text-[13.5px] text-fg">{byId[id]?.t ?? id.replace(/-/g, ' ')}</span>
+              <span className="hidden font-mono text-[10.5px] text-fg-3 sm:inline">{byId[id]?.s ?? snake(id)}</span>
+              <span className="cmd-arrow text-fg-3">→</span>
+            </Link>
+          </li>
         ))}
-      </div>
+      </ul>
     </div>
   );
 }
 
+// Quick targets from this device: modules in the repair queue, and the ones
+// you opened most recently. Hidden until there is something to show.
 export default function PracticeLauncher() {
   const [ready, setReady] = useState(false);
   const [weak, setWeak] = useState<string[]>([]);
   const [recent, setRecent] = useState<string[]>([]);
-  const [byId, setById] = useState<Record<string, Entry>>({});
+  const [byId, setById] = useState<Record<string, IndexEntry>>({});
 
   useEffect(() => {
     const repair = getRepairQueue().filter((i) => !i.completed_at);
     setWeak([...new Set(repair.map((i) => i.module_id))].slice(0, 8));
     setRecent([...getVisited()].reverse().slice(0, 8));
-    fetch('/search-index.json')
-      .then((r) => r.json())
-      .then((data: Entry[]) => {
-        const m: Record<string, Entry> = {};
-        for (const e of data) if (e.k === 'm' && e.id) m[e.id] = e;
-        setById(m);
-      })
+    loadSearchIndex()
+      .then((index) => setById(moduleEntries(index)))
       .catch(() => {})
       .finally(() => setReady(true));
   }, []);
 
-  const titleOf = (id: string) => byId[id]?.t ?? id.replace(/-/g, ' ');
   if (!ready || (weak.length === 0 && recent.length === 0)) return null;
 
   return (
-    <section className="clay clay-surface mb-8 space-y-5 p-5">
-      <Row label="Practise your weak spots" color="red" ids={weak} titleOf={titleOf} />
-      <Row label="Recently studied" color="blue" ids={recent} titleOf={titleOf} />
+    <section className="gridlines mb-8 md:grid-cols-2" aria-label="Quick targets">
+      {weak.length ? <Targets label="target: weak spots" tone="danger" ids={weak} byId={byId} /> : null}
+      {recent.length ? <Targets label="target: recently studied" tone="accent" ids={recent} byId={byId} /> : null}
     </section>
   );
 }

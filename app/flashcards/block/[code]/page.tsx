@@ -3,6 +3,11 @@ import { notFound } from 'next/navigation';
 import { lecturesBySubject, subjectBySlug, subjectSlug } from '../../../../content';
 import { buildFlashcards } from '../../../../lib/flashcards/build';
 import FlashcardSession from '../../../../components/FlashcardSession';
+import Page from '../../../../components/ui/Page';
+import PageHeader from '../../../../components/ui/PageHeader';
+
+// Every valid page is generated at build time; anything else is a real 404.
+export const dynamicParams = false;
 
 export function generateStaticParams() {
   return Object.keys(lecturesBySubject).map((code) => ({ code: subjectSlug(code) }));
@@ -10,7 +15,7 @@ export function generateStaticParams() {
 
 export function generateMetadata({ params }: { params: { code: string } }) {
   const s = subjectBySlug[params.code];
-  return { title: s ? `Flashcards: ${s.code} — WilliamsHub` : 'Flashcards — WilliamsHub' };
+  return { title: s ? `cards: ${s.code}` : 'cards' };
 }
 
 // Keep block decks focused: a couple of the highest-value cards per topic.
@@ -26,28 +31,28 @@ export default function BlockFlashcardsPage({ params }: { params: { code: string
   const cards = buildFlashcards(modules, PER_MODULE);
 
   return (
-    <main className="mx-auto max-w-2xl px-5 py-8">
-      <Link
-        href={`/subject/${params.code}`}
-        className="text-sm text-slate-500 transition hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
+    <Page crumbs={[{ label: 'cards', href: '/flashcards' }, { label: subject.code }]} width="w-doc">
+      <PageHeader
+        kicker={
+          <>
+            <strong>block deck</strong>
+            <span>{subject.code}</span>
+            <span>·</span>
+            <span>{cards.length} cards</span>
+          </>
+        }
+        title={subject.name}
+        lede={`${cards.length} cards across ${modules.length} modules — up to ${PER_MODULE} of the highest-value cards each, reshuffled every run.`}
+        className="mb-6"
       >
-        ← {subject.code} — {subject.name}
-      </Link>
-
-      <header className="mb-6 mt-4">
-        <div className="livery-stripe mb-4 h-1.5 w-full rounded-full" />
-        <div className="text-xs font-bold uppercase tracking-wide text-[#1e5bd6] dark:text-[#7AA0FF]">Block flashcards</div>
-        <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-900 dark:text-white">{subject.name}</h1>
-        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-          {cards.length} cards across {modules.length} topics — up to {PER_MODULE} high-value cards each. Shuffled every run.
+        <p className="mt-3">
+          <Link href={`/subject/${params.code}`} className="cmd">
+            ← back to {subject.code}
+          </Link>
         </p>
-      </header>
+      </PageHeader>
 
       <FlashcardSession cards={cards} title={`${subject.code} — ${subject.name}`} />
-
-      <footer className="mt-10 text-center text-xs text-slate-400 dark:text-slate-500">
-        WilliamsHub · M-8 · a VESTRIPPN3.0 satellite
-      </footer>
-    </main>
+    </Page>
   );
 }

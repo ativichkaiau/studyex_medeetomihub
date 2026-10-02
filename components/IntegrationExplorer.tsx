@@ -13,55 +13,45 @@ import { getWeakModules } from '../lib/user/weakness';
 
 // Active Integration — interactive map + list. Renders from a fully-resolved,
 // serializable view-model (no content imports → tiny client bundle). The map is
-// HTML clay-cards with a measured SVG edge overlay drawn behind them.
+// HTML nodes with a measured SVG edge overlay drawn behind them.
 
 type Cat = 'prerequisite' | 'forward' | 'horizontal' | 'vertical';
 
 interface CatMeta {
   label: string;
-  dot: string;
-  text: string;
-  stroke: string; // hex for SVG edges
+  color: string; // a --cat-* token, as an rgb() colour
 }
 
 const CAT: Record<Cat, CatMeta> = {
-  prerequisite: { label: 'Before this, review', dot: 'bg-indigo-500', text: 'text-indigo-600 dark:text-indigo-400', stroke: '#6366f1' },
-  forward: { label: 'Leads forward to', dot: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-400', stroke: '#10b981' },
-  horizontal: { label: 'Same-block peers', dot: 'bg-sky-500', text: 'text-sky-600 dark:text-sky-400', stroke: '#0ea5e9' },
-  vertical: { label: 'Clinical applications', dot: 'bg-fuchsia-500', text: 'text-fuchsia-600 dark:text-fuchsia-400', stroke: '#d946ef' },
+  prerequisite: { label: 'prerequisite', color: 'rgb(var(--cat-pre))' },
+  forward: { label: 'leads_to', color: 'rgb(var(--cat-fwd))' },
+  horizontal: { label: 'peer', color: 'rgb(var(--cat-peer))' },
+  vertical: { label: 'clinical', color: 'rgb(var(--cat-clin))' },
 };
 
-const STRENGTH_BADGE: Record<IntegrationStrength, string> = {
-  critical: 'bg-rose-100 text-rose-700 dark:bg-rose-900/45 dark:text-rose-200',
-  strong: 'bg-amber-100 text-amber-700 dark:bg-amber-900/45 dark:text-amber-200',
-  moderate: 'bg-sky-100 text-sky-700 dark:bg-sky-900/45 dark:text-sky-200',
-  weak: 'bg-black/5 text-slate-500 dark:bg-white/10 dark:text-slate-400',
+const STRENGTH_TAG: Record<IntegrationStrength, string> = {
+  critical: 'tag tag-danger',
+  strong: 'tag tag-warn',
+  moderate: 'tag',
+  weak: 'tag tag-muted',
 };
 
 const STRENGTH_LINE: Record<IntegrationStrength, { w: number; o: number }> = {
-  critical: { w: 4, o: 0.95 },
-  strong: { w: 3, o: 0.85 },
-  moderate: { w: 2.2, o: 0.7 },
-  weak: { w: 1.5, o: 0.55 },
+  critical: { w: 2.6, o: 0.9 },
+  strong: { w: 2, o: 0.75 },
+  moderate: { w: 1.5, o: 0.6 },
+  weak: { w: 1, o: 0.45 },
 };
 
 // ── shared bits ──────────────────────────────────────────────────────────────
 
-function SubjectChip({ code }: { code: string | null }) {
+function SubjectCode({ code }: { code: string | null }) {
   if (!code) return null;
-  return (
-    <span className="shrink-0 rounded bg-black/5 px-1 py-0.5 text-[10px] font-medium text-slate-500 dark:bg-white/10 dark:text-slate-400">
-      {code}
-    </span>
-  );
+  return <span className="flex-none font-mono text-[10.5px] text-fg-3">{code}</span>;
 }
 
-function StrengthBadge({ strength }: { strength: IntegrationStrength }) {
-  return (
-    <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${STRENGTH_BADGE[strength]}`}>
-      {strength}
-    </span>
-  );
+function Swatch({ cat }: { cat: Cat }) {
+  return <span aria-hidden="true" className="h-2 w-2 flex-none rounded-[2px]" style={{ background: CAT[cat].color }} />;
 }
 
 // ── MAP ──────────────────────────────────────────────────────────────────────
@@ -100,16 +90,14 @@ function NodeCard({
       onFocus={() => onHover(edge.id)}
       onBlur={() => onHover(null)}
       title={weak ? 'A weak spot for you — this link is worth drilling' : undefined}
-      className={`clay-node clay-surface group/node flex max-w-[15rem] items-center gap-1.5 px-2.5 py-1.5 transition hover:-translate-y-0.5 ${
-        weak ? 'ring-2 ring-amber-400/80 dark:ring-amber-400/70' : ''
+      className={`flex max-w-[15rem] items-center gap-2 rounded-sm border bg-panel px-2.5 py-1.5 hover:bg-raised ${
+        weak ? 'border-warn/70' : 'border-line-strong'
       }`}
     >
-      <span className={`h-2 w-2 shrink-0 rounded-full ${weak ? 'bg-amber-500' : CAT[cat].dot}`} />
-      <span className="truncate text-xs font-semibold text-slate-800 group-hover/node:text-slate-950 dark:text-slate-100 dark:group-hover/node:text-white">
-        {edge.title}
-      </span>
-      {weak ? <span className="shrink-0 text-[11px]" aria-label="weak spot">◍</span> : null}
-      <SubjectChip code={edge.subjectCode} />
+      <Swatch cat={cat} />
+      <span className="truncate text-[12.5px] font-medium text-fg">{edge.title}</span>
+      {weak ? <span className="tag tag-warn">weak</span> : null}
+      <SubjectCode code={edge.subjectCode} />
     </Link>
   );
 }
@@ -131,9 +119,9 @@ function Group({
   const align = cat === 'prerequisite' ? 'sm:items-end' : cat === 'forward' ? 'sm:items-start' : 'items-center';
   return (
     <div className={`flex flex-col gap-1.5 ${layout === 'column' ? align : 'items-center'}`}>
-      <div className="flex items-center gap-1.5">
-        <span className={`h-1.5 w-1.5 rounded-full ${CAT[cat].dot}`} />
-        <span className={`text-[10px] font-bold uppercase tracking-wide ${CAT[cat].text}`}>{CAT[cat].label}</span>
+      <div className="flex items-center gap-1.5 font-mono text-[10.5px] uppercase tracking-[0.08em] text-fg-3">
+        <Swatch cat={cat} />
+        {CAT[cat].label}
       </div>
       <div className={layout === 'band' ? 'flex flex-wrap justify-center gap-1.5' : 'flex flex-col gap-1.5'}>
         {edges.map((e) => (
@@ -202,22 +190,22 @@ function MapView({ view, weak }: { view: ModuleGraphView; weak: Set<string> }) {
             viewBox={`0 0 ${dims.w} ${dims.h}`}
             aria-hidden="true"
           >
-            {segs.map((s) => {
+            {segs.map((s, n) => {
               const dim = hovered && hovered !== s.id;
               const on = hovered === s.id;
               const line = STRENGTH_LINE[s.strength];
               return (
-                <g key={s.id}>
+                <g key={`${s.cat}-${s.id}-${n}`}>
                   {s.weak ? (
                     <line
                       x1={s.x1}
                       y1={s.y1}
                       x2={s.x2}
                       y2={s.y2}
-                      stroke="#f59e0b"
-                      strokeWidth={(on ? line.w + 1 : line.w) + 4}
+                      style={{ stroke: 'var(--warning)' }}
+                      strokeWidth={(on ? line.w + 1 : line.w) + 3}
                       strokeLinecap="round"
-                      opacity={dim ? 0.1 : 0.4}
+                      opacity={dim ? 0.08 : 0.3}
                     />
                   ) : null}
                   <line
@@ -225,10 +213,10 @@ function MapView({ view, weak }: { view: ModuleGraphView; weak: Set<string> }) {
                     y1={s.y1}
                     x2={s.x2}
                     y2={s.y2}
-                    stroke={CAT[s.cat].stroke}
+                    style={{ stroke: CAT[s.cat].color }}
                     strokeWidth={on ? line.w + 1 : line.w}
                     strokeLinecap="round"
-                    opacity={dim ? 0.12 : on ? 1 : line.o}
+                    opacity={dim ? 0.1 : on ? 1 : line.o}
                   />
                 </g>
               );
@@ -242,17 +230,10 @@ function MapView({ view, weak }: { view: ModuleGraphView; weak: Set<string> }) {
           <div className="grid w-full items-center gap-3 sm:grid-cols-[1fr_auto_1fr]">
             <Group cat="prerequisite" edges={view.prerequisite} layout="column" onHover={setHovered} weak={weak} />
 
-            <div
-              data-center
-              className="livery-edge clay-node mx-auto max-w-[16rem] overflow-hidden bg-[linear-gradient(135deg,#2e5bff_0%,#0a1a7a_100%)] px-4 py-3 text-center text-white"
-            >
-              <div className="text-[9px] font-bold uppercase tracking-[0.2em] text-white/70">This module</div>
-              <div className="mt-0.5 text-sm font-black leading-tight">{view.center.title}</div>
-              {view.center.subjectCode ? (
-                <div className="mt-1 inline-block rounded bg-white/15 px-1.5 py-0.5 text-[10px] font-semibold text-white/90">
-                  {view.center.subjectCode}
-                </div>
-              ) : null}
+            <div data-center className="mx-auto max-w-[16rem] rounded-sm border border-accent/70 bg-root px-4 py-2.5 text-center">
+              <div className="font-mono text-[10px] uppercase tracking-[0.1em] text-accent">this module</div>
+              <div className="mt-0.5 text-[13.5px] font-semibold leading-tight text-fg">{view.center.title}</div>
+              {view.center.subjectCode ? <div className="mt-1 font-mono text-[10.5px] text-fg-3">{view.center.subjectCode}</div> : null}
             </div>
 
             <Group cat="forward" edges={view.forward} layout="column" onHover={setHovered} weak={weak} />
@@ -262,30 +243,22 @@ function MapView({ view, weak }: { view: ModuleGraphView; weak: Set<string> }) {
         </div>
       </div>
 
-      <p className="mt-3 flex min-h-[1.25rem] flex-wrap items-center justify-center gap-x-1.5 gap-y-1 text-center text-xs text-slate-500 dark:text-slate-400">
+      <p className="mt-4 flex min-h-[1.25rem] flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center font-mono text-[11.5px] text-fg-3">
         {hoveredEdge ? (
           <>
-            <span>{hoveredEdge.reason}</span>
-            {hoveredEdge.via ? (
-              <span className="rounded bg-indigo-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-600 dark:text-indigo-300">
-                via {hoveredEdge.via}
-              </span>
-            ) : null}
-            {hoveredEdge.evidence ? (
-              <span className="rounded bg-black/5 px-1.5 py-0.5 text-[10px] font-medium text-slate-500 dark:bg-white/10 dark:text-slate-400">
-                ◆ {hoveredEdge.evidence}
-              </span>
-            ) : null}
+            <span className="font-sans text-[12.5px] text-fg-2">{hoveredEdge.reason}</span>
+            {hoveredEdge.via ? <span className="tag">via {hoveredEdge.via}</span> : null}
+            {hoveredEdge.evidence ? <span className="tag tag-muted">{hoveredEdge.evidence}</span> : null}
           </>
         ) : segs.some((s) => s.weak) ? (
-          '◍ = a weak spot from your misses — those links are lit amber. Hover a node to see how it connects.'
+          'weak = a spot you keep missing; those links are marked. hover a node to see how it connects.'
         ) : (
-          'Hover a node to see how it connects · click to open the module.'
+          'hover a node to see how it connects · click to open the module'
         )}
       </p>
 
       {view.traps.length > 0 || view.repair.length > 0 ? (
-        <div className="mt-4 grid gap-4 border-t border-black/5 pt-4 dark:border-white/10 sm:grid-cols-2">
+        <div className="mt-5 grid gap-5 border-t border-line pt-5 sm:grid-cols-2">
           <TrapSection traps={view.traps} />
           <RepairSection items={view.repair} />
         </div>
@@ -298,34 +271,17 @@ function MapView({ view, weak }: { view: ModuleGraphView; weak: Set<string> }) {
 
 function EdgeRow({ edge, weak }: { edge: EdgeView; weak: boolean }) {
   return (
-    <li className="flex items-start gap-2 text-sm">
-      <StrengthBadge strength={edge.strength} />
-      <span className="leading-snug">
-        {weak ? (
-          <span className="mr-1 text-amber-500" title="A weak spot for you" aria-label="weak spot">
-            ◍
-          </span>
-        ) : null}
-        <Link
-          href={`/lecture/${edge.id}`}
-          className={`font-semibold underline decoration-dotted underline-offset-2 hover:text-sky-700 dark:hover:text-sky-300 ${
-            weak ? 'text-amber-700 dark:text-amber-300' : 'text-slate-900 dark:text-white'
-          }`}
-        >
+    <li className="flex items-start gap-2 text-[13.5px] leading-snug">
+      <span className={STRENGTH_TAG[edge.strength]}>{edge.strength}</span>
+      <span>
+        {weak ? <span className="tag tag-warn mr-1.5">weak</span> : null}
+        <Link href={`/lecture/${edge.id}`} className="font-medium text-fg underline decoration-line-strong decoration-dotted underline-offset-[3px] hover:text-accent">
           {edge.title}
         </Link>{' '}
-        <SubjectChip code={edge.subjectCode} />
-        <span className="text-slate-500 dark:text-slate-400"> — {edge.reason}</span>
-        {edge.via ? (
-          <span className="ml-1 inline-block whitespace-nowrap rounded bg-indigo-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-600 dark:text-indigo-300">
-            via {edge.via}
-          </span>
-        ) : null}
-        {edge.evidence ? (
-          <span className="ml-1 inline-block whitespace-nowrap rounded bg-black/5 px-1.5 py-0.5 text-[10px] font-medium text-slate-500 dark:bg-white/10 dark:text-slate-400">
-            ◆ {edge.evidence}
-          </span>
-        ) : null}
+        <SubjectCode code={edge.subjectCode} />
+        <span className="text-fg-2"> — {edge.reason}</span>
+        {edge.via ? <span className="tag ml-1.5">via {edge.via}</span> : null}
+        {edge.evidence ? <span className="tag tag-muted ml-1.5">{edge.evidence}</span> : null}
       </span>
     </li>
   );
@@ -335,11 +291,11 @@ function EdgeSection({ cat, edges, weak }: { cat: Cat; edges: EdgeView[]; weak: 
   if (edges.length === 0) return null;
   return (
     <div>
-      <div className="mb-2 flex items-center gap-2">
-        <span className={`h-2 w-2 rounded-full ${CAT[cat].dot}`} />
-        <h4 className={`text-xs font-bold uppercase tracking-wide ${CAT[cat].text}`}>{CAT[cat].label}</h4>
-      </div>
-      <ul className="space-y-1.5">
+      <h4 className="mb-2 flex items-center gap-2 font-mono text-[10.5px] uppercase tracking-[0.08em] text-fg-3">
+        <Swatch cat={cat} />
+        {CAT[cat].label}
+      </h4>
+      <ul className="grid gap-2">
         {edges.map((e) => (
           <EdgeRow key={e.id} edge={e} weak={weak.has(e.id)} />
         ))}
@@ -352,34 +308,34 @@ function TrapSection({ traps }: { traps: TrapView[] }) {
   if (traps.length === 0) return null;
   return (
     <div>
-      <div className="mb-2 flex items-center gap-2">
-        <span className="h-2 w-2 rounded-full bg-rose-500" />
-        <h4 className="text-xs font-bold uppercase tracking-wide text-rose-600 dark:text-rose-400">Exam traps</h4>
-      </div>
-      <div className="space-y-2">
+      <h4 className="mb-2 font-mono text-[10.5px] uppercase tracking-[0.08em] text-danger">exam_traps</h4>
+      <div className="grid gap-2">
         {traps.map((t, i) => (
-          <div key={i} className="clay-node bg-rose-100 p-3 text-sm dark:bg-rose-900/35">
-            <div className="text-[11px] font-bold uppercase tracking-wide text-rose-600 dark:text-rose-300">
-              {t.questionCategory}
+          <div key={i} className="trap text-[13.5px]">
+            <div className="trap-head">
+              <span className="trap-category">{t.questionCategory}</span>
             </div>
-            <div className="mt-1 flex items-start gap-1.5">
-              <span className="font-bold text-rose-500">✗</span>
-              <span className="text-slate-600 dark:text-slate-300">{t.wrongInstinct}</span>
+            <div className="trap-row">
+              <span className="trap-key" data-tone="danger">
+                ✗ instinct
+              </span>
+              <span className="trap-wrong">{t.wrongInstinct}</span>
             </div>
-            <div className="mt-0.5 flex items-start gap-1.5">
-              <span className="font-bold text-emerald-600 dark:text-emerald-400">✓</span>
-              <span className="font-medium text-slate-900 dark:text-white">{t.rightAnswer}</span>
+            <div className="trap-row">
+              <span className="trap-key" data-tone="ok">
+                ✓ answer
+              </span>
+              <span className="font-medium text-fg">{t.rightAnswer}</span>
             </div>
             {t.relatedId ? (
-              <div className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
-                Review:{' '}
-                <Link
-                  href={`/lecture/${t.relatedId}`}
-                  className="font-semibold text-slate-800 underline decoration-dotted underline-offset-2 hover:text-sky-700 dark:text-slate-100 dark:hover:text-sky-300"
-                >
-                  {t.relatedTitle ?? t.relatedId.replace(/-/g, ' ')}
-                </Link>{' '}
-                <SubjectChip code={t.relatedSubject ?? null} />
+              <div className="trap-row">
+                <span className="trap-key">review</span>
+                <span>
+                  <Link href={`/lecture/${t.relatedId}`} className="xref">
+                    {t.relatedTitle ?? t.relatedId.replace(/-/g, ' ')}
+                  </Link>{' '}
+                  <SubjectCode code={t.relatedSubject ?? null} />
+                </span>
               </div>
             ) : null}
           </div>
@@ -393,26 +349,18 @@ function RepairSection({ items }: { items: RepairView[] }) {
   if (items.length === 0) return null;
   return (
     <div>
-      <div className="mb-2 flex items-center gap-2">
-        <span className="h-2 w-2 rounded-full bg-amber-500" />
-        <h4 className="text-xs font-bold uppercase tracking-wide text-amber-600 dark:text-amber-400">
-          Repair recommendations
-        </h4>
-      </div>
-      <ul className="space-y-1.5">
+      <h4 className="mb-2 font-mono text-[10.5px] uppercase tracking-[0.08em] text-warn">repair_recommendations</h4>
+      <ul className="grid gap-2">
         {items.map((r, i) => (
-          <li key={`${r.id}-${i}`} className="flex items-start gap-2 text-sm">
-            <StrengthBadge strength={r.strength} />
-            <span className="leading-snug">
-              <span className="italic text-slate-500 dark:text-slate-400">{r.trigger} → </span>
-              <Link
-                href={`/lecture/${r.id}`}
-                className="font-semibold text-slate-900 underline decoration-dotted underline-offset-2 hover:text-sky-700 dark:text-white dark:hover:text-sky-300"
-              >
+          <li key={`${r.id}-${i}`} className="flex items-start gap-2 text-[13.5px] leading-snug">
+            <span className={STRENGTH_TAG[r.strength]}>{r.strength}</span>
+            <span>
+              <span className="text-fg-3">{r.trigger} → </span>
+              <Link href={`/lecture/${r.id}`} className="font-medium text-fg underline decoration-line-strong decoration-dotted underline-offset-[3px] hover:text-accent">
                 {r.title}
               </Link>{' '}
-              <SubjectChip code={r.subjectCode} />
-              {r.reason ? <span className="text-slate-500 dark:text-slate-400"> — {r.reason}</span> : null}
+              <SubjectCode code={r.subjectCode} />
+              {r.reason ? <span className="text-fg-2"> — {r.reason}</span> : null}
             </span>
           </li>
         ))}
@@ -423,7 +371,7 @@ function RepairSection({ items }: { items: RepairView[] }) {
 
 function ListView({ view, weak }: { view: ModuleGraphView; weak: Set<string> }) {
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className="grid gap-5 sm:grid-cols-2">
       <EdgeSection cat="prerequisite" edges={view.prerequisite} weak={weak} />
       <EdgeSection cat="forward" edges={view.forward} weak={weak} />
       <EdgeSection cat="horizontal" edges={view.horizontal} weak={weak} />
@@ -453,20 +401,10 @@ export default function IntegrationExplorer({ view }: { view: ModuleGraphView })
 
   return (
     <div>
-      <div className="mb-4 clay-inset inline-flex gap-1 p-1">
+      <div className="modebar mb-5" role="tablist" aria-label="Integration view">
         {(['map', 'list'] as const).map((m) => (
-          <button
-            key={m}
-            type="button"
-            onClick={() => setMode(m)}
-            aria-pressed={mode === m}
-            className={`rounded-lg px-3 py-1 text-xs font-bold uppercase tracking-wide transition active:translate-y-px ${
-              mode === m
-                ? 'clay text-[#1e5bd6] dark:text-[#7AA0FF]'
-                : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
-            }`}
-          >
-            {m === 'map' ? '◎ Map' : '☰ List'}
+          <button key={m} type="button" role="tab" aria-selected={mode === m} onClick={() => setMode(m)}>
+            {m}
           </button>
         ))}
       </div>

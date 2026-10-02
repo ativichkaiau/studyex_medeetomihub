@@ -1,167 +1,189 @@
 import Link from 'next/link';
-import type { CSSProperties } from 'react';
-import { lectures, lectureById, lecturesBySubject, curriculum, subjectSlug, subjectOfSource, subjectByCode, referenceFrameworkByCode } from '../content';
-import { type YearData } from '../components/CurriculumBrowser';
-import BlockBrowser from '../components/BlockBrowser';
+import { curriculum, lectureById, lectures, lecturesBySubject, referenceFrameworkByCode, subjectOfSource, lectureSetSlug } from '../content';
 import { onePagerGroups } from '../content/onepagers';
-import HubIcon from '../components/HubIcon';
-import LiverySlashes from '../components/LiverySlashes';
-import AnimatedCount from '../components/AnimatedCount';
+import Page from '../components/ui/Page';
+import Panel from '../components/ui/Panel';
+import Cmd from '../components/ui/Cmd';
+import { NAV } from '../components/shell/nav';
+import RecentContext from '../components/overview/RecentContext';
+import SessionStatus from '../components/overview/SessionStatus';
+import LiveCount from '../components/overview/LiveCount';
+import { BRAND, BUILD } from '../lib/brand';
+import { INDEX_STATS, TRAP_COUNT } from '../lib/indexStats';
+import { getModuleBank } from '../lib/questions/bank';
+import { lectureCode, snake, yearCode } from '../lib/paths';
 
-export default function Home() {
-  const years: YearData[] = curriculum.map((y) => {
-    const subjects = y.subjects.map((s) => {
-      const mods = lecturesBySubject[s.code] ?? [];
-      const framework = referenceFrameworkByCode[s.code];
-      return {
-        code: s.code,
-        name: s.name,
-        // distinct lectures (L1, L2, …), not module count
-        count: new Set(mods.map((l) => l.source)).size,
-        modules: mods.length,
-        slug: subjectSlug(s.code),
-        isFramework: Boolean(framework),
-        frameworkChapters: framework?.chapters.length,
-        frameworkUnits: framework?.units.length,
-        unitLabel: y.label === 'Reference' ? 'chapter' as const : 'lecture' as const,
-      };
-    });
-    return {
-      year: y.year,
-      label: y.label,
-      note: y.note,
-      hasContent: subjects.some((s) => s.count > 0 || s.isFramework),
-      subjects,
-    };
-  });
-  const defaultYear = years.find((y) => y.hasContent)?.year ?? years[0].year;
-
-  // Subject codes that actually have WilliamsHub content (for OnePager cross-links).
-  const contentCodes = Object.entries(lecturesBySubject)
-    .filter(([, mods]) => mods.length > 0)
-    .map(([code]) => code);
-  const blockCount = new Set([...Object.keys(lecturesBySubject), ...Object.keys(referenceFrameworkByCode)]).size;
-  // OnePager view opens on the first year that has content, else its first year.
-  const onePagerYearsWithContent = onePagerGroups
-    .filter((g) => g.subjects.some((s) => contentCodes.includes(s.code)))
-    .map((g) => g.year);
-  const onePagerDefaultYear = onePagerYearsWithContent[0] ?? onePagerGroups[0].year;
-
-  const first = lectures[0];
+export default function Overview() {
+  const questions = lectures.reduce((n, l) => n + getModuleBank(l.id).length, 0);
   const featured = lectureById['tetralogy-of-fallot'] ?? lectures[0];
-  const trapCount = lectures.reduce((n, l) => n + l.traps.length, 0);
-
   const featuredCode = subjectOfSource[featured.source];
-  const featuredSubject = featuredCode ? subjectByCode[featuredCode] : undefined;
+
+  // Per-year index: how much of each year is actually indexed.
+  const years = curriculum.map((y) => {
+    const blocks = y.subjects.length;
+    const indexed = y.subjects.filter((s) => (lecturesBySubject[s.code]?.length ?? 0) > 0 || referenceFrameworkByCode[s.code]).length;
+    const modules = y.subjects.reduce((n, s) => n + (lecturesBySubject[s.code]?.length ?? 0), 0);
+    return { year: y.year, label: y.label, code: yearCode(y.year, y.label), blocks, indexed, modules };
+  });
+  const onePagerFolders = onePagerGroups.filter((g) => g.driveUrl).length;
 
   return (
-    <main className="mx-auto max-w-6xl px-5 pb-24 pt-8 sm:pt-10">
-      <section className="home-hero" aria-labelledby="hero-title">
-        <div className="hero-traces" aria-hidden="true"><span /><span /><span /></div>
-        <div className="hero-stripes" aria-hidden="true"><span /><span /><span /></div>
-        <div className="flex items-center gap-3">
-          <LiverySlashes />
-          <span className="eyebrow">MedCMU / Lecture atlas</span>
+    <Page crumbs={[{ label: 'overview' }]} aside={<span>build {BUILD.date || '—'} · {BUILD.sha}</span>}>
+      <header>
+        <div className="kicker">
+          <strong>{BRAND.tagline}</strong>
+          <span>·</span>
+          <span>
+            build {BUILD.date || '—'} · {BUILD.sha}
+          </span>
         </div>
+        <h1 className="mt-3 break-all font-mono text-[26px] font-semibold leading-tight tracking-[-0.03em] text-fg sm:text-[40px]">
+          {BRAND.name}
+          <span className="text-accent">_</span>
+        </h1>
+        <SessionStatus />
+      </header>
 
-        <div className="relative grid gap-9 pb-10 pt-10 lg:grid-cols-[1.45fr_1fr] lg:gap-16 lg:pb-12 lg:pt-12">
-          <div data-reveal>
-            <h1 id="hero-title" className="hero-title">
-              Own the lecture.
-              <br />
-              <span>Beat the exam trap.</span>
-            </h1>
-            <p className="mt-5 max-w-md text-sm leading-7 text-[var(--muted)] sm:text-[15px]">
-              Your MedCMU lectures, connected. Recall the essentials,
-              understand the mechanism, and spot the exam trap.
-            </p>
-            <div className="mt-7 flex flex-wrap items-center gap-x-6 gap-y-2">
-              <a href="#browse" className="primary-action">
-                Choose a block <HubIcon name="arrow" />
-              </a>
-              <Link href={`/lecture/${first.id}`} className="text-action">
-                Run primer <span aria-hidden="true">↗</span>
-              </Link>
-            </div>
-            <dl className="library-stats mt-9" aria-label="Library overview">
-              {[
-                { value: blockCount, label: 'Blocks' },
-                { value: lectures.length, label: 'Modules' },
-                { value: trapCount, label: 'Exam traps' },
-              ].map((stat) => (
-                <div key={stat.label}>
-                  <dt className="order-2">{stat.label}</dt>
-                  <dd className="order-1"><AnimatedCount value={stat.value} /></dd>
-                </div>
-              ))}
-            </dl>
-          </div>
-
-          <aside
-            className="featured-module self-start p-5 sm:p-6"
-            aria-labelledby="featured-title"
-            data-reveal
-            style={{ '--reveal-i': 1 } as CSSProperties}
-          >
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <span className="eyebrow">Featured module</span>
-              {featuredSubject && (
-                <span className="font-mono text-[10px] text-[var(--muted)]">
-                  {featuredSubject.code} / {featuredSubject.yearLabel}
-                </span>
-              )}
-            </div>
-            <h2 id="featured-title" className="mt-4 text-xl font-semibold tracking-tight text-[var(--ink)]">
-              <Link href={`/lecture/${featured.id}`} className="transition hover:text-[var(--accent)]">
-                {featured.title}
-              </Link>
-            </h2>
-            <p className="mt-2 text-xs leading-5 text-[var(--muted)]">{featured.mechanism.title}</p>
-            <ol className="mechanism-preview my-5 space-y-3" aria-label="Mechanism preview">
-              {featured.mechanism.steps.slice(0, 3).map((step, index) => (
-                <li key={step.id} className="flex items-start gap-3 text-xs leading-6 text-[var(--ink)]">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[var(--line)] font-mono text-[10px] text-[var(--muted)]" aria-hidden="true">
-                    {String(index + 1).padStart(2, '0')}
+      <div className="gridlines mt-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+        <section aria-labelledby="ops" className="p-5">
+          <h2 id="ops" className="label mb-3">
+            <span className="text-accent">&gt;</span> select operation
+          </h2>
+          <ul className="-mx-2 grid">
+            {NAV.slice(1).map((item) => (
+              <li key={item.href}>
+                <Link
+                  href={item.href}
+                  className="tree-row grid grid-cols-[112px_minmax(0,1fr)_auto] gap-3 px-2 py-1.5 text-fg-2"
+                >
+                  <span className="font-mono text-[13px] text-fg">
+                    [ {item.label} ]
                   </span>
-                  <span>{step.label}</span>
-                </li>
-              ))}
-            </ol>
-            <div className="border-t border-[var(--line)] pt-2">
-              <Link href={`/lecture/${featured.id}`} className="text-action w-full justify-between">
-                Open module <HubIcon name="arrow" />
-              </Link>
-            </div>
-          </aside>
-        </div>
-      </section>
+                  <span className="truncate font-sans text-[13px] text-fg-3">{item.hint}</span>
+                  <span className="font-mono text-[10.5px] text-fg-3">g {item.key}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
 
-      <section id="browse" aria-labelledby="browse-title" className="scroll-mt-36 pt-9 sm:pt-10 md:scroll-mt-24" data-reveal>
-        <div className="section-rule mb-4">
-          <span className="eyebrow">01 / The library</span>
-          <LiverySlashes />
-        </div>
-        <h2 id="browse-title" className="text-2xl font-semibold tracking-tight text-[var(--ink)]">
-          Choose your block
-        </h2>
-        <p className="mb-6 mt-2 text-sm leading-6 text-[var(--muted)]">
-          Pick a year. Find your block. Study with interactive lectures or your OnePagers.
-        </p>
-        <BlockBrowser
-          years={years}
-          defaultYear={defaultYear}
-          onePagerDefaultYear={onePagerDefaultYear}
-          contentCodes={contentCodes}
-        />
-      </section>
+        <section aria-labelledby="sysidx" className="p-5">
+          <h2 id="sysidx" className="label mb-3">
+            system_index
+          </h2>
+          <dl className="kv">
+            <dt>blocks</dt>
+            <dd className="tabular">{INDEX_STATS.blocks}</dd>
+            <dt>lectures</dt>
+            <dd className="tabular">{INDEX_STATS.lectures.toLocaleString('en-US')}</dd>
+            <dt>modules</dt>
+            <dd className="tabular">{INDEX_STATS.modules.toLocaleString('en-US')}</dd>
+            <dt>exam_traps</dt>
+            <dd className="tabular">{TRAP_COUNT.toLocaleString('en-US')}</dd>
+            <dt>questions</dt>
+            <dd className="tabular">{questions.toLocaleString('en-US')}</dd>
+            <dt>seen</dt>
+            <dd>
+              <LiveCount of="seen" /> <span className="dim">modules · this device</span>
+            </dd>
+            <dt>saved</dt>
+            <dd>
+              <LiveCount of="saved" />
+            </dd>
+            <dt>repair</dt>
+            <dd>
+              <LiveCount of="repair" />
+            </dd>
+          </dl>
+        </section>
 
-      <footer
-        className="site-footer mt-12 flex flex-wrap items-center justify-between gap-4 pt-5 text-[11px] leading-5 text-[var(--muted)]"
-        data-reveal
-      >
-        <span className="flex items-center gap-3"><LiverySlashes /> WilliamsHub · A VESTRIPPN3.0 satellite</span>
-        <span>Built from MedCMU lectures · Alongside your OnePagers</span>
-      </footer>
-    </main>
+        <section aria-labelledby="ctx" className="p-5">
+          <h2 id="ctx" className="label mb-3">
+            recent_context
+          </h2>
+          <RecentContext />
+        </section>
+
+        <section aria-labelledby="featured" className="p-5">
+          <div className="mb-3 flex items-baseline justify-between gap-3">
+            <h2 id="featured" className="label">
+              featured_module
+            </h2>
+            <span className="font-mono text-[11px] text-fg-3">
+              {[featuredCode, lectureCode(featured.source)].filter(Boolean).join('/')}
+            </span>
+          </div>
+          <p className="text-[17px] font-medium leading-snug text-fg">
+            <Link href={`/lecture/${featured.id}`} className="hover:text-accent">
+              {featured.title}
+            </Link>
+          </p>
+          <p className="mt-1 font-mono text-[11.5px] text-fg-3"># {snake(featured.id)} · mechanism</p>
+          <ol className="chain-vertical mt-4" aria-label={featured.mechanism.title}>
+            {featured.mechanism.steps.slice(0, 4).map((step, i, all) => (
+              <li key={step.id} className="grid justify-items-start gap-0.5">
+                <span className="chain-node" data-emphasis={step.emphasis ?? 'normal'}>
+                  {step.label}
+                </span>
+                {i < all.length - 1 ? (
+                  <span className="chain-arrow pl-3.5" aria-hidden="true">
+                    ↓
+                  </span>
+                ) : null}
+              </li>
+            ))}
+          </ol>
+          <div className="mt-5">
+            <Cmd href={`/lecture/${featured.id}`}>open module</Cmd>
+          </div>
+        </section>
+      </div>
+
+      <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+        <Panel label="index by year" meta={<Cmd href="/library">library</Cmd>} bodyClassName="">
+          <div className="row row-head" style={{ ['--cols' as string]: '56px minmax(0,1fr) 90px 80px' }}>
+            <span>year</span>
+            <span>scope</span>
+            <span className="text-right">indexed</span>
+            <span className="text-right">modules</span>
+          </div>
+          {years.map((y) => (
+            <Link
+              key={y.year}
+              href={`/library#${y.code.toLowerCase()}`}
+              className={`row ${y.indexed === 0 ? 'row-dim' : ''}`}
+              style={{ ['--cols' as string]: '56px minmax(0,1fr) 90px 80px' }}
+            >
+              <span className="cell-id">{y.code}</span>
+              <span className="cell-title text-fg-2">{y.label === 'Reference' ? 'reference texts' : `${y.blocks} blocks`}</span>
+              <span className="cell-num">
+                {y.indexed}/{y.blocks}
+              </span>
+              <span className="cell-num">{y.modules.toLocaleString('en-US')}</span>
+            </Link>
+          ))}
+        </Panel>
+
+        <Panel label="onepager_archive" meta={<Cmd href="/library/onepagers">open</Cmd>}>
+          <dl className="kv">
+            <dt>source</dt>
+            <dd>google drive · external</dd>
+            <dt>folders</dt>
+            <dd>
+              {onePagerFolders} linked <span className="dim">· {onePagerGroups.length - onePagerFolders} pending</span>
+            </dd>
+            <dt>subjects</dt>
+            <dd>{onePagerGroups.reduce((n, g) => n + g.subjects.length, 0)}</dd>
+            <dt>role</dt>
+            <dd>compiled summaries · this index supplements them</dd>
+          </dl>
+        </Panel>
+      </div>
+
+      <p className="mt-8 font-mono text-[11.5px] text-fg-3">
+        # start anywhere: <Link href={`/lecture-set/${lectureSetSlug(featured.source)}`} className="xref">{featuredCode ? `${featuredCode}/` : ''}{lectureCode(featured.source)}</Link>{' '}
+        or press <kbd className="kbd">⌘K</kbd> to search {INDEX_STATS.modules.toLocaleString('en-US')} modules.
+      </p>
+    </Page>
   );
 }

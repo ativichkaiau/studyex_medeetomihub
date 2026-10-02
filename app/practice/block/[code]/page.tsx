@@ -2,6 +2,13 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { lecturesBySubject, subjectBySlug, subjectSlug, lectureSetSlug } from '../../../../content';
 import { getModuleBank } from '../../../../lib/questions/bank';
+import Page from '../../../../components/ui/Page';
+import PageHeader from '../../../../components/ui/PageHeader';
+import Meta from '../../../../components/ui/Meta';
+import { lectureCode, lectureName } from '../../../../lib/paths';
+
+// Every valid page is generated at build time; anything else is a real 404.
+export const dynamicParams = false;
 
 export function generateStaticParams() {
   return Object.keys(lecturesBySubject).map((code) => ({ code: subjectSlug(code) }));
@@ -9,13 +16,16 @@ export function generateStaticParams() {
 
 export function generateMetadata({ params }: { params: { code: string } }) {
   const s = subjectBySlug[params.code];
-  return { title: s ? `Practice: ${s.code} — WilliamsHub` : 'Practice — WilliamsHub' };
+  return { title: s ? `practice: ${s.code}` : 'practice' };
 }
 
 function lectureNo(source: string): number {
   const m = source.match(/^(?:L|Ch\s+)(\d+)/i);
   return m ? parseInt(m[1], 10) : 999;
 }
+
+const COLS = '64px minmax(0,1fr) 72px 80px 48px';
+const COLS_SM = '64px minmax(0,1fr) 32px';
 
 export default function BlockPracticeLauncher({ params }: { params: { code: string } }) {
   const subject = subjectBySlug[params.code];
@@ -34,66 +44,74 @@ export default function BlockPracticeLauncher({ params }: { params: { code: stri
     .map(([source, e]) => ({ source, slug: lectureSetSlug(source), moduleCount: e.items.length, count: e.count, no: lectureNo(source) }))
     .sort((a, b) => a.no - b.no);
   const total = lectures.reduce((n, l) => n + l.count, 0);
+  const modules = lectures.reduce((n, l) => n + l.moduleCount, 0);
 
   return (
-    <main className="mx-auto max-w-3xl px-5 py-8">
-      <Link
-        href="/practice"
-        className="text-sm text-slate-500 transition hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
+    <Page crumbs={[{ label: 'practice', href: '/practice' }, { label: subject.code }]} width="w-mid">
+      <PageHeader
+        kicker={
+          <>
+            <strong>practice</strong>
+            <span>{subject.code}</span>
+            <span>·</span>
+            <span>select scope</span>
+          </>
+        }
+        title={subject.name}
+        lede={`Run the whole block as a mixed set, or narrow the scope to one ${unit}.`}
       >
-        ← Practice
-      </Link>
+        <Meta
+          className="mt-5"
+          rows={[
+            ['pool', `${total.toLocaleString('en-US')} questions`],
+            [`${unit}s`, String(lectures.length)],
+            ['modules', String(modules)],
+          ]}
+        />
+      </PageHeader>
 
-      <header className="mb-6 mt-4">
-        <div className="livery-stripe mb-4 h-1.5 w-full rounded-full" />
-        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-[#1e5bd6] dark:text-[#7AA0FF]">
-          <span>Practice · block</span>
-          <span className="clay-pill px-2 py-0.5">{subject.code}</span>
-        </div>
-        <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-900 dark:text-white">{subject.name}</h1>
-        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-          {total.toLocaleString()} question{total === 1 ? '' : 's'} across {lectures.length} {unit}
-          {lectures.length === 1 ? '' : 's'}. Pick a {unit}, or practise a mixed set from the whole block.
-        </p>
-      </header>
-
-      <Link
-        href={`/practice/block/${params.code}/all`}
-        className="clay clay-surface mb-6 flex items-center justify-between gap-3 p-4 transition hover:-translate-y-0.5"
-      >
+      <Link href={`/practice/block/${params.code}/all`} className="panel group mb-8 flex flex-wrap items-center justify-between gap-3 p-4 hover:border-line-strong hover:bg-raised">
         <span className="min-w-0">
-          <span className="text-xs font-bold uppercase tracking-wide text-[#1e5bd6] dark:text-[#7AA0FF]">
-            Mixed — whole block
-          </span>
-          <span className="mt-0.5 block text-sm font-bold text-slate-900 dark:text-white">
-            20 random from all {lectures.length} {unit}s
+          <span className="label block text-accent">scope: {subject.code}/*</span>
+          <span className="mt-1 block text-[15px] font-medium text-fg">Mixed — the whole block</span>
+          <span className="mt-0.5 block font-mono text-[11.5px] text-fg-3">
+            20 random from {lectures.length} {unit}s · {total.toLocaleString('en-US')} in the pool
           </span>
         </span>
-        <span className="shrink-0 text-[11px] font-semibold text-slate-400">{total.toLocaleString()} →</span>
+        <span className="btn btn-primary">
+          run <span aria-hidden="true">→</span>
+        </span>
       </Link>
 
-      <h2 className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">By {unit}</h2>
-      <div className="space-y-2">
+      <h2 className="sec-label">
+        <span>scope: {unit}</span>
+        <span className="sec-meta">{lectures.length}</span>
+      </h2>
+      <div className="rows" style={{ ['--cols-lg' as string]: COLS, ['--cols-sm' as string]: COLS_SM }}>
+        <div className="row row-head [--cols:var(--cols-sm)] sm:[--cols:var(--cols-lg)]">
+          <span>id</span>
+          <span>{unit}</span>
+          <span className="hidden text-right sm:block">modules</span>
+          <span className="hidden text-right sm:block">questions</span>
+          <span />
+        </div>
         {lectures.map((l) => (
-          <Link
-            key={l.slug}
-            href={`/practice/lecture/${l.slug}`}
-            className="clay-node clay-surface flex items-center justify-between gap-3 p-4 transition hover:-translate-y-0.5"
-          >
-            <span className="min-w-0">
-              <span className="block truncate text-sm font-bold text-slate-900 dark:text-white">{l.source}</span>
-              <span className="text-xs text-slate-500 dark:text-slate-400">
-                {l.moduleCount} module{l.moduleCount === 1 ? '' : 's'}
+          <Link key={l.slug} href={`/practice/lecture/${l.slug}`} className="row group [--cols:var(--cols-sm)] sm:[--cols:var(--cols-lg)]">
+            <span className="cell-id">{lectureCode(l.source)}</span>
+            <span className="cell-title">
+              <span className="block truncate">{lectureName(l.source)}</span>
+              <span className="cell-sub sm:hidden">
+                {l.count.toLocaleString('en-US')} q · {l.moduleCount} modules
               </span>
             </span>
-            <span className="shrink-0 text-[11px] font-semibold text-slate-400">{l.count.toLocaleString()} Q →</span>
+            <span className="cell-num hidden sm:block">{l.moduleCount}</span>
+            <span className="cell-num hidden sm:block">{l.count.toLocaleString('en-US')}</span>
+            <span className="cell-go">
+              <span className="cmd-arrow">→</span>
+            </span>
           </Link>
         ))}
       </div>
-
-      <footer className="mt-10 text-center text-xs text-slate-400 dark:text-slate-500">
-        WilliamsHub · M-8 · a VESTRIPPN3.0 satellite
-      </footer>
-    </main>
+    </Page>
   );
 }

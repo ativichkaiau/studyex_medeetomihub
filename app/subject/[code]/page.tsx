@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import type { CSSProperties } from 'react';
+import { Fragment } from 'react';
 import { notFound } from 'next/navigation';
 import {
   lecturesBySubject,
@@ -9,13 +9,22 @@ import {
   partOfSource,
   referenceFrameworkByCode,
 } from '../../../content';
-import { lectureTheme } from '../../../lib/theme';
+import { onePagerGroups } from '../../../content/onepagers';
 import { buildBlockGraph } from '../../../lib/integrations/graphView';
 import { keystonesForSubject } from '../../../lib/integrations/centrality';
+import { getModuleBank } from '../../../lib/questions/bank';
+import { stripMarkup } from '../../../lib/concept/modes';
+import { lectureCode, lectureName, pad2, yearCode } from '../../../lib/paths';
 import BlockMap from '../../../components/BlockMap';
-import HubIcon from '../../../components/HubIcon';
-import LiverySlashes from '../../../components/LiverySlashes';
+import Page from '../../../components/ui/Page';
+import PageHeader from '../../../components/ui/PageHeader';
+import Panel from '../../../components/ui/Panel';
+import Meta from '../../../components/ui/Meta';
+import { SeenCount, SeenMarker } from '../../../components/library/Seen';
 import type { Lecture } from '../../../lib/types';
+
+// Every valid page is generated at build time; anything else is a real 404.
+export const dynamicParams = false;
 
 export function generateStaticParams() {
   return [...new Set([...Object.keys(lecturesBySubject), ...Object.keys(referenceFrameworkByCode)])].map((code) => ({ code: subjectSlug(code) }));
@@ -23,39 +32,10 @@ export function generateStaticParams() {
 
 export function generateMetadata({ params }: { params: { code: string } }) {
   const s = subjectBySlug[params.code];
-  return { title: s ? `${s.code} ${s.name} — WilliamsHub` : 'WilliamsHub' };
+  return { title: s ? `${s.code} ${s.name}` : 'block' };
 }
 
-function LectureCard({ l, theme, i }: { l: Lecture; theme: ReturnType<typeof lectureTheme>; i: number }) {
-  // Each topic opens the whole-lecture format, scrolled to its section.
-  return (
-    <Link
-      href={`/lecture-set/${lectureSetSlug(l.source)}#${l.id}`}
-      className="clay group flex flex-col p-5 transition hover:border-[var(--accent)]"
-      style={{ '--i': i } as CSSProperties}
-    >
-      <div className="flex items-center gap-2">
-        <span className={`h-2.5 w-2.5 rounded-full ${theme.dot}`} />
-        <span className="text-[15px] font-medium leading-6 text-[var(--ink)] transition group-hover:text-[var(--accent)]">
-          {l.title}
-        </span>
-      </div>
-      <p className="mt-1.5 line-clamp-2 text-sm leading-6 text-[var(--muted)]">
-        {l.highYield[0]?.replace(/\*\*/g, '')}
-      </p>
-      <div className="mt-3 flex flex-wrap gap-1.5">
-        {l.tags
-          .filter((t) => t.kind === 'mechanism' || t.kind === 'exam')
-          .slice(0, 2)
-          .map((t) => (
-            <span key={t.label} className={`rounded-full px-2 py-0.5 text-xs font-medium ${theme.chipBg}`}>
-              {t.label}
-            </span>
-          ))}
-      </div>
-    </Link>
-  );
-}
+const LECTURE_COLS = '64px minmax(0,1fr) auto 56px';
 
 export default function SubjectPage({ params }: { params: { code: string } }) {
   const subject = subjectBySlug[params.code];
@@ -68,7 +48,7 @@ export default function SubjectPage({ params }: { params: { code: string } }) {
   const block = buildBlockGraph(subject.code);
   const keystones = keystonesForSubject(subject.code, 4);
 
-  // Group this subject's lectures by source (L1 → L9).
+  // Group this subject's modules by source lecture (L1 → Ln).
   const groups = items.reduce<Record<string, Lecture[]>>((acc, l) => {
     (acc[l.source] ??= []).push(l);
     return acc;
@@ -81,9 +61,8 @@ export default function SubjectPage({ params }: { params: { code: string } }) {
     return a.localeCompare(b, undefined, { numeric: true });
   });
 
-  // Group sources into "Parts" (e.g. HGA Part 1–5) while preserving order.
-  // Subjects without any part mapping fall into a single undefined-part group
-  // and render exactly as before (no headers).
+  // Group sources into parts (e.g. HGA Part 1–5) while preserving order.
+  // Subjects without a part mapping fall into one unlabelled group.
   const partedGroups: { part: string | undefined; sources: typeof sources }[] = [];
   for (const entry of sources) {
     const part = partOfSource[entry[0]];
@@ -91,102 +70,130 @@ export default function SubjectPage({ params }: { params: { code: string } }) {
     if (last && last.part === part) last.sources.push(entry);
     else partedGroups.push({ part, sources: [entry] });
   }
-  const hasParts = partedGroups.some((g) => g.part);
   const chaptersByNumber = new Map(framework?.chapters.map((chapter) => [chapter.number, chapter]));
   const isFrameworkOnly = Boolean(framework && items.length === 0);
   const unitLabel = subject.yearLabel === 'Reference' ? 'chapter' : 'lecture';
+  const lectureCount = sources.filter(([s]) => !s.startsWith('Additional Topics')).length;
+  const traps = items.reduce((n, l) => n + l.traps.length, 0);
+  const questions = items.reduce((n, l) => n + getModuleBank(l.id).length, 0);
+  const onePager = onePagerGroups.find((g) => g.subjects.some((s) => s.code === subject.code));
+  const allIds = items.map((l) => l.id);
 
   return (
-    <main className="mx-auto max-w-5xl px-5 py-8">
-      <Link
-        href="/"
-        className="text-sm text-[var(--muted)] transition hover:text-[var(--ink)]"
+    <Page
+      crumbs={[{ label: 'library', href: '/library' }, { label: subject.code }]}
+      aside={items.length ? <SeenCount ids={allIds} label="seen " /> : undefined}
+    >
+      <SeenMarker />
+      <PageHeader
+        kicker={
+          <>
+            <strong>block</strong>
+            <span>{yearCode(subject.year, subject.yearLabel)}</span>
+            <span>·</span>
+            <span>{isFrameworkOnly ? 'reading spine' : 'indexed'}</span>
+          </>
+        }
+        title={subject.name}
+        lede={
+          isFrameworkOnly
+            ? 'Reference outline only — chapter notes and practice questions will follow.'
+            : framework
+              ? `Original study notes aligned to ${framework.source}. Each ${unitLabel} opens as one study scroll; read alongside the source chapter.`
+              : `Each ${unitLabel} opens as one study scroll; each module opens on its own for focused recall.`
+        }
+        className="mb-6"
       >
-        ← All years &amp; blocks
-      </Link>
-
-      <header className="mb-8 mt-5" data-reveal>
-        <div className="flex items-center gap-3">
-          <LiverySlashes />
-          <span className="eyebrow">{subject.code} · {subject.yearLabel}</span>
+        <div className="mt-6 grid gap-6 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+          <Meta
+            rows={[
+              ['block_id', subject.code],
+              ['year', subject.yearLabel === 'Reference' ? 'reference' : pad2(subject.year)],
+              [`${unitLabel}s`, framework ? `${lectureCount} / ${framework.chapters.length} with notes` : String(lectureCount)],
+              ['modules', String(items.length)],
+              ...(items.length
+                ? ([
+                    ['exam_traps', String(traps)],
+                    ['questions', questions.toLocaleString('en-US')],
+                    ['seen', <SeenCount key="seen" ids={allIds} />],
+                  ] as [string, React.ReactNode][])
+                : []),
+              ...(onePager
+                ? ([
+                    [
+                      'onepagers',
+                      onePager.driveUrl ? (
+                        <a key="op" href={onePager.driveUrl} target="_blank" rel="noopener noreferrer" className="xref">
+                          drive · {onePager.term.toLowerCase()} ↗
+                        </a>
+                      ) : (
+                        <span key="op" className="dim">pending</span>
+                      ),
+                    ],
+                  ] as [string, React.ReactNode][])
+                : []),
+            ]}
+          />
+          {items.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              <Link href={`/practice/block/${params.code}`} className="btn btn-primary">
+                run practice <span aria-hidden="true">→</span>
+              </Link>
+              <Link href={`/flashcards/block/${params.code}`} className="btn">
+                load cards <span aria-hidden="true">→</span>
+              </Link>
+            </div>
+          ) : null}
         </div>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--ink)] sm:text-4xl">
-          {subject.name}
-        </h1>
-        <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
-          {framework ? `${sources.length} of ${framework.chapters.length} chapters with notes · ${framework.units.length} study units` : `${sources.length} ${unitLabel}${sources.length === 1 ? '' : 's'}`}
-          {items.length > 0 ? ` · ${items.length} modules` : ''}
-          {isFrameworkOnly ? ' — reading spine only.' : ` — each ${unitLabel} opens as one study scroll.`}
-        </p>
-        {subject.code === 'GHP' && (
-          <p className="mt-2 text-xs leading-5 text-[var(--muted)]">
-            Original study notes aligned to all 85 chapters in the 14th-edition contents, with mechanisms and practice questions.
-          </p>
-        )}
-        {items.length > 0 ? <div className="mt-4 flex flex-wrap gap-2">
-          <Link
-            href={`/flashcards/block/${params.code}`}
-            className="clay-pill inline-flex min-h-9 items-center gap-1.5 px-3 py-2 text-xs font-medium text-[var(--accent)] transition hover:border-[var(--accent)] active:translate-y-px"
-          >
-            <HubIcon name="cards" /> Flashcards
-          </Link>
-          <Link
-            href={`/practice/block/${params.code}`}
-            className="clay-pill inline-flex min-h-9 items-center gap-1.5 px-3 py-2 text-xs font-medium text-[var(--accent)] transition hover:border-[var(--accent)] active:translate-y-px"
-          >
-            <HubIcon name="practice" /> Practise this block
-          </Link>
-        </div> : null}
-      </header>
+      </PageHeader>
 
       {framework ? (
-        <section className="clay clay-surface mb-8 p-5 sm:p-6" data-reveal>
-          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[var(--line)] pb-5">
-            <div>
-              <div className="eyebrow">Reading spine</div>
-              <h2 className="mt-2 text-xl font-semibold tracking-tight text-[var(--ink)]">
-                {framework.title}
-              </h2>
-            </div>
-            <span className="clay-pill px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
-              {framework.edition}
-            </span>
-          </div>
-          <p className="mt-4 max-w-3xl text-sm leading-6 text-[var(--muted)]">
-            {framework.description}
-          </p>
-          <div className="mt-6 space-y-7">
+        <Panel
+          label="reading_spine"
+          title={framework.title}
+          meta={<span className="tag">{framework.edition}</span>}
+          className="mb-8"
+          bodyClassName=""
+        >
+          <p className="max-w-3xl px-4 pt-4 text-[13.5px] leading-6 text-fg-2">{framework.description}</p>
+          <div className="grid gap-6 p-4">
             {framework.units.map((unit, unitIndex) => (
-              <section key={unit.id} className="border-t border-[var(--line)] pt-5 first:border-t-0 first:pt-0">
-                <div className="flex items-start gap-3">
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--accent)]/10 font-mono text-[10px] font-semibold text-[var(--accent)]">
-                    {String(unitIndex + 1).padStart(2, '0')}
-                  </span>
-                  <div>
-                    <h3 className="text-sm font-semibold text-[var(--ink)]">{unit.title}</h3>
-                    <p className="mt-1 text-xs leading-5 text-[var(--muted)]">{unit.description}</p>
-                  </div>
-                </div>
-                <ol className="mt-4 grid gap-2 sm:grid-cols-2">
+              <section key={unit.id}>
+                <h3 className="sec-label mb-2">
+                  <span className="sec-no">UNIT_{pad2(unitIndex + 1)}</span>
+                  <span className="normal-case tracking-normal">{unit.title}</span>
+                </h3>
+                <p className="mb-3 text-[12.5px] leading-5 text-fg-3">{unit.description}</p>
+                <ol className="rows">
                   {unit.chapters.map((number) => {
                     const chapter = chaptersByNumber.get(number);
                     if (!chapter) return null;
                     const source = `Ch ${chapter.number} — ${chapter.title}`;
                     const modules = groups[source];
-                    return (
-                      <li id={`framework-${framework.code.toLowerCase()}-chapter-${chapter.number}`} key={chapter.number} className="flex scroll-mt-24 items-start gap-3 rounded-xl border border-[var(--line)] px-3 py-2.5">
-                        <span className="font-mono text-[10px] font-semibold text-[var(--accent)]">{String(chapter.number).padStart(2, '0')}</span>
-                        <span className="min-w-0 flex-1">
-                          {modules ? (
-                            <Link href={`/lecture-set/${lectureSetSlug(source)}`} className="block text-xs font-medium leading-5 text-[var(--ink)] underline decoration-[var(--line)] underline-offset-4 transition hover:text-[var(--accent)]">
-                              {chapter.title} <span aria-hidden="true">↗</span>
-                            </Link>
-                          ) : <span className="block text-xs font-medium leading-5 text-[var(--ink)]">{chapter.title}</span>}
-                          <span className="mt-0.5 block text-[11px] leading-5 text-[var(--muted)]">{chapter.focus}</span>
-                          <span className={`mt-1 block text-[10px] font-medium ${modules ? 'text-[var(--accent)]' : 'text-[var(--muted)]'}`}>
-                            {modules ? `${modules.length} study modules · ${modules.reduce((n, m) => n + m.quiz.length, 0)} core questions` : 'Outline only'}
-                          </span>
+                    const inner = (
+                      <>
+                        <span className="cell-id">CH{pad2(chapter.number)}</span>
+                        <span className="cell-title">
+                          <span className="block">{chapter.title}</span>
+                          <span className="cell-sub font-sans text-[12px]">{chapter.focus}</span>
                         </span>
+                        <span className="cell-num">
+                          {modules ? `${modules.length} mod · ${modules.reduce((n, m) => n + m.quiz.length, 0)} q` : 'outline'}
+                        </span>
+                      </>
+                    );
+                    const id = `framework-${framework.code.toLowerCase()}-chapter-${chapter.number}`;
+                    return (
+                      <li key={chapter.number} id={id} className="scroll-mt-24">
+                        {modules ? (
+                          <Link href={`/lecture-set/${lectureSetSlug(source)}`} className="row" style={{ ['--cols' as string]: '56px minmax(0,1fr) auto' }}>
+                            {inner}
+                          </Link>
+                        ) : (
+                          <div className="row row-dim" style={{ ['--cols' as string]: '56px minmax(0,1fr) auto' }}>
+                            {inner}
+                          </div>
+                        )}
                       </li>
                     );
                   })}
@@ -194,128 +201,103 @@ export default function SubjectPage({ params }: { params: { code: string } }) {
               </section>
             ))}
           </div>
-          <p className="mt-6 border-t border-dashed border-[var(--line)] pt-4 text-xs leading-5 text-[var(--muted)]">
-            {isFrameworkOnly ? 'Chapter outlines are available; study notes and practice questions will follow.' : 'Available chapters contain original study notes, mechanisms, and practice questions. They introduce the chapter’s core concepts; the remaining chapters currently have outlines only.'}
-          </p>
-        </section>
+        </Panel>
       ) : null}
 
-      {block.nodes.length >= 2 && block.hasEdges ? (
-        <section className="clay clay-surface mb-8 p-5" data-reveal>
-          <div className="mb-2 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <span className="h-2.5 w-2.5 rounded-full bg-gradient-to-r from-indigo-500 to-fuchsia-500" />
-              <h2 className="text-sm font-semibold uppercase tracking-[0.1em] text-[var(--ink)]">
-                Block map
-              </h2>
-            </div>
-            <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">
-              how the {unitLabel}s connect
-            </span>
-          </div>
-          <BlockMap view={block} unitLabel={unitLabel} />
-        </section>
+      {(block.nodes.length >= 2 && block.hasEdges) || keystones.length > 0 ? (
+        <div className="mb-8 grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+          {block.nodes.length >= 2 && block.hasEdges ? (
+            <Panel label="block_graph" meta={`how the ${unitLabel}s connect`}>
+              <BlockMap view={block} unitLabel={unitLabel} />
+            </Panel>
+          ) : null}
+          {keystones.length > 0 ? (
+            <Panel label="keystones" meta="study these first" bodyClassName="">
+              <p className="px-4 pb-1 pt-3 text-[12.5px] leading-5 text-fg-3">The most connected modules in this block — the hubs the rest lean on.</p>
+              <ol className="mt-1">
+                {keystones.map((k, i) => (
+                  <li key={k.id} className="border-t border-line first:border-t-0">
+                    <Link href={`/lecture/${k.id}`} className="row border-0" style={{ ['--cols' as string]: '28px minmax(0,1fr) auto' }} data-mid={k.id}>
+                      <span className="font-mono text-[11px] text-fg-3">{pad2(i + 1)}</span>
+                      <span className="cell-title truncate">{k.title}</span>
+                      <span className="cell-num" title={`${k.inbound} module${k.inbound === 1 ? '' : 's'} link here`}>
+                        {k.inbound > 0 ? `← ${k.inbound}` : ''}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ol>
+            </Panel>
+          ) : null}
+        </div>
       ) : null}
 
-      {keystones.length > 0 ? (
-        <section className="clay clay-surface mb-8 p-5" data-reveal>
-          <div className="mb-2 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <span className="h-2.5 w-2.5 rounded-full bg-[#ffcc00]" />
-              <h2 className="text-sm font-semibold uppercase tracking-[0.1em] text-[var(--ink)]">
-                Keystone concepts
-              </h2>
-            </div>
-            <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">
-              study these first
+      {items.length > 0 ? (
+        <section aria-labelledby="lecture-index">
+          <h2 id="lecture-index" className="sec-label">
+            <span>{unitLabel}_index</span>
+            <span className="sec-meta">
+              {lectureCount} {unitLabel}s · {items.length} modules
             </span>
-          </div>
-          <p className="mb-3 text-xs text-[var(--muted)]">
-            The most connected modules in this block — the hubs the rest lean on.
-          </p>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {keystones.map((k, i) => (
-              <Link
-                key={k.id}
-                href={`/lecture/${k.id}`}
-                className="clay-node clay-surface flex items-center gap-3 px-3 py-2.5 transition hover:-translate-y-0.5"
-              >
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#ffcc00]/20 font-mono text-[11px] font-medium text-[#8a6d00] dark:text-[#ffcc00]">
-                  {i + 1}
-                </span>
-                <span className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--ink)]">
-                  {k.title}
-                </span>
-                {k.inbound > 0 ? (
-                  <span
-                    className="shrink-0 text-[10px] font-semibold text-slate-400"
-                    title={`${k.inbound} module${k.inbound === 1 ? '' : 's'} link here`}
-                  >
-                    ◈ {k.inbound}
-                  </span>
-                ) : null}
-              </Link>
+          </h2>
+          <div className="rows">
+            {partedGroups.map((group, gi) => (
+              <Fragment key={group.part ?? `_${gi}`}>
+                {group.part ? <div className="row row-group">{group.part}</div> : null}
+                {group.sources.map(([source, lects]) => {
+                  const isAdditional = source.startsWith('Additional Topics');
+                  const ids = lects.map((l) => l.id);
+                  const lectureTraps = lects.reduce((n, l) => n + l.traps.length, 0);
+                  return (
+                    <div key={source} className="border-t border-line first:border-t-0">
+                      {isAdditional ? <div className="row row-group">supplementary · beyond the core lecture list</div> : null}
+                      <Link
+                        href={`/lecture-set/${lectureSetSlug(source)}`}
+                        className="row group border-t-0"
+                        style={{ ['--cols' as string]: LECTURE_COLS }}
+                      >
+                        <span className="cell-id">{lectureCode(source)}</span>
+                        <span className="cell-title font-medium">
+                          {lectureName(source)}
+                          <span className="cell-sub block sm:hidden">
+                            {lects.length} mod · {lectureTraps} traps · seen <SeenCount ids={ids} />
+                          </span>
+                        </span>
+                        <span className="cell-num hidden sm:block">
+                          {pad2(lects.length)} mod · {pad2(lectureTraps)} traps · seen <SeenCount ids={ids} />
+                        </span>
+                        <span className="cell-go">
+                          open <span className="cmd-arrow">→</span>
+                        </span>
+                      </Link>
+                      <ul className="tree pb-2 pl-3.5 pr-3.5 sm:pl-[94px]">
+                        {lects.map((l, i) => (
+                          <li key={l.id}>
+                            <Link
+                              href={`/lecture-set/${lectureSetSlug(l.source)}#${l.id}`}
+                              className="tree-row gap-2 pr-2"
+                              data-mid={l.id}
+                              title={l.id}
+                            >
+                              <span className="tree-glyph">{i === lects.length - 1 ? '└──' : '├──'}</span>
+                              <span className="seen-dot" aria-hidden="true" />
+                              <span className="min-w-0 flex-none font-sans text-[13.5px] text-fg sm:max-w-[48%] sm:truncate">{l.title}</span>
+                              <span className="hidden min-w-0 flex-1 truncate font-sans text-[12.5px] text-fg-3 md:block">
+                                {l.highYield[0] ? stripMarkup(l.highYield[0]) : ''}
+                              </span>
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  );
+                })}
+              </Fragment>
             ))}
           </div>
+          <p className="mt-3 font-mono text-[11px] text-fg-3"># ● = opened on this device · modules open inside their {unitLabel} scroll</p>
         </section>
       ) : null}
-
-      {partedGroups.map((group) => (
-        <div key={group.part ?? '_'}>
-          {hasParts && group.part ? (
-            <div className="mb-5 mt-2 flex items-center gap-3">
-              <span className="clay-pill px-3 py-1 text-sm font-semibold tracking-tight text-[var(--ink)]">
-                {group.part}
-              </span>
-              <span className="h-px flex-1 bg-[var(--line)]" />
-            </div>
-          ) : null}
-          {group.sources.map(([source, lects]) => {
-            const theme = lectureTheme(source);
-            const isAdditional = source.startsWith('Additional Topics');
-            return (
-              <section
-                key={source}
-                className={`mb-9 ${isAdditional ? 'mt-10 border-t border-dashed border-[var(--line)] pt-8' : ''}`}
-              >
-                <div className={`mb-3 h-1 w-12 rounded-full bg-gradient-to-r ${theme.grad}`} />
-                <Link
-                  href={`/lecture-set/${lectureSetSlug(source)}`}
-                  className={`group flex items-center gap-2 ${isAdditional ? 'mb-1' : 'mb-4'}`}
-                >
-                  <span className={`h-3 w-3 rounded-full ${theme.dot}`} />
-                  <h2 className={`text-base font-semibold tracking-tight transition ${theme.text}`}>
-                    {isAdditional ? 'Additional Topics' : source}
-                  </h2>
-                  {isAdditional ? (
-                    <span className="clay-pill px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-300">
-                      supplementary
-                    </span>
-                  ) : null}
-                  <span className={`clay-pill px-2.5 py-0.5 text-xs font-semibold ${theme.text}`}>{lects.length}</span>
-                  <span className={`text-xs font-semibold opacity-0 transition group-hover:opacity-100 ${theme.text}`}>
-                    View whole {unitLabel} →
-                  </span>
-                </Link>
-                {isAdditional ? (
-                  <p className="mb-4 text-xs text-slate-500 dark:text-slate-400">
-                    Extra exam-relevant topics beyond the core lecture list.
-                  </p>
-                ) : null}
-                <div className="grid-stagger grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {lects.map((l, i) => (
-                    <LectureCard key={l.id} l={l} theme={theme} i={i} />
-                  ))}
-                </div>
-              </section>
-            );
-          })}
-        </div>
-      ))}
-
-      <footer className="mt-12 text-center text-xs text-[var(--muted)]">
-        WilliamsHub · M-8 · a VESTRIPPN3.0 satellite
-      </footer>
-    </main>
+    </Page>
   );
 }

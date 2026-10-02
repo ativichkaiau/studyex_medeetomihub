@@ -1,5 +1,5 @@
 // OnePager library — the user's own study one-pagers, hosted in Google Drive and
-// organized by Year → Term/Module → Subject (MedCMU's own grouping). WilliamsHub
+// organized by Year → Term/Module → Subject (MedCMU's own grouping). studyex_medeetomihub
 // SUPPLEMENTS these; the OnePager view links out to the Drive folders.
 //
 // Drive links are per Term/Module folder (each folder holds several subjects'

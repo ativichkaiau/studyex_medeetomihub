@@ -1,96 +1,71 @@
 'use client';
 
 import { useState } from 'react';
-import type { CSSProperties } from 'react';
 import type { MechanismChain as Chain, MechanismStep, Emphasis } from '../lib/types';
 
-// Claymorphic mechanism diagram. Ordered spine left→right with arrows, then
-// labelled branches. 'key' steps are exam-critical (mint), 'danger' steps lethal (rose).
-// Tap a node with a `detail` to reveal the one-line "why".
+// Cause → effect, left to right, then the labelled branches. 'key' steps are
+// exam-critical, 'danger' steps lethal. A step with a detail opens it in place.
 
-const tone: Record<Emphasis, string> = {
-  normal: 'clay-surface text-slate-700 dark:text-slate-200',
-  key: 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/45 dark:text-emerald-100',
-  danger: 'bg-rose-100 text-rose-900 dark:bg-rose-900/45 dark:text-rose-100',
-};
+const FLAG: Record<Emphasis, string | null> = { normal: null, key: 'key', danger: 'lethal' };
 
-function Node({ step, index }: { step: MechanismStep; index: number }) {
+function Node({ step }: { step: MechanismStep }) {
   const [open, setOpen] = useState(false);
   const e = step.emphasis ?? 'normal';
-  return (
-    <button
-      type="button"
-      onClick={() => step.detail && setOpen((v) => !v)}
-      aria-expanded={step.detail ? open : undefined}
-      data-emphasis={e}
-      style={{ '--i': index } as CSSProperties}
-      className={`mechanism-node clay-node relative px-3 py-2 text-sm font-medium transition ${tone[e]} ${
-        step.detail ? 'cursor-pointer active:translate-y-px' : 'cursor-default'
-      }`}
-    >
-      <span className="flex items-center gap-1.5">
-        {e === 'key' && <span aria-hidden>★</span>}
-        {e === 'danger' && <span aria-hidden>⚠</span>}
-        {step.label}
-      </span>
-      {step.detail && open && (
-        <span className="clay clay-surface absolute left-0 top-full z-10 mt-2 w-56 p-3 text-left text-xs font-normal text-slate-600 dark:text-slate-300">
-          {step.detail}
+  const flag = FLAG[e];
+  const body = (
+    <>
+      {flag ? <span className="chain-flag">{flag}</span> : null}
+      <span>{step.label}</span>
+      {step.detail ? (
+        <span className="chain-more" aria-hidden="true">
+          {open ? '−' : '+'}
         </span>
-      )}
+      ) : null}
+    </>
+  );
+  if (!step.detail) {
+    return (
+      <span className="chain-node" data-emphasis={e}>
+        {body}
+      </span>
+    );
+  }
+  return (
+    <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} data-emphasis={e} className="mechanism-node chain-node">
+      {body}
+      {open ? <span className="chain-detail reveal-in">{step.detail}</span> : null}
     </button>
   );
 }
 
-function Arrow() {
+function Steps({ steps }: { steps: MechanismStep[] }) {
   return (
-    <span className="mechanism-arrow select-none text-slate-400 dark:text-slate-500" aria-hidden>
-      →
-    </span>
+    <div className="chain">
+      {steps.map((s, i) => (
+        <span key={s.id} className="chain-step">
+          <Node step={s} />
+          {i < steps.length - 1 ? (
+            <span className="chain-arrow" aria-hidden="true">
+              →
+            </span>
+          ) : null}
+        </span>
+      ))}
+    </div>
   );
 }
 
 export default function MechanismChain({ chain }: { chain: Chain }) {
   return (
-    <section className="clay clay-surface p-5">
-      <div className="mb-4 flex items-center gap-2">
-        <span className="h-2.5 w-2.5 rounded-full bg-teal-500" />
-        <h3 className="text-sm font-bold uppercase tracking-wide text-teal-600 dark:text-teal-400">
-          {chain.title}
-        </h3>
-      </div>
-
-      {/* Spine */}
-      <div className="mechanism-spine flex flex-wrap items-center gap-2">
-        {chain.steps.map((s, i) => (
-          <span key={s.id} className="flex items-center gap-2">
-            <Node step={s} index={i} />
-            {i < chain.steps.length - 1 && <Arrow />}
-          </span>
-        ))}
-      </div>
-
-      {/* Branches */}
+    <div>
+      <p className="mb-3 font-mono text-[12px] text-fg-3"># {chain.title}</p>
+      <Steps steps={chain.steps} />
       {chain.branches?.map((b, bi) => (
-        <div
-          key={bi}
-          className="mechanism-branch mt-4 border-l-2 border-dashed border-slate-300 pl-4 dark:border-slate-600"
-        >
-          {b.title && (
-            <div className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">
-              ↳ {b.title}
-            </div>
-          )}
-          <div className="flex flex-wrap items-center gap-2">
-            {b.steps.map((s, i) => (
-              <span key={s.id} className="flex items-center gap-2">
-                <Node step={s} index={i} />
-                {i < b.steps.length - 1 && <Arrow />}
-              </span>
-            ))}
-          </div>
+        <div key={bi} className="chain-branch">
+          {b.title ? <p className="mb-2 font-mono text-[11px] text-fg-3">↳ {b.title}</p> : null}
+          <Steps steps={b.steps} />
         </div>
       ))}
-    </section>
+    </div>
   );
 }

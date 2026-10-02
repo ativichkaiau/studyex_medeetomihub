@@ -1,71 +1,95 @@
 import Link from 'next/link';
+import { Fragment } from 'react';
 import { lecturesBySubject, subjectByCode, subjectSlug } from '../../content';
-import LiverySlashes from '../../components/LiverySlashes';
-import HubIcon from '../../components/HubIcon';
+import { buildFlashcards } from '../../lib/flashcards/build';
+import Page from '../../components/ui/Page';
+import PageHeader from '../../components/ui/PageHeader';
+import Meta from '../../components/ui/Meta';
+import LiveCount from '../../components/overview/LiveCount';
+import { yearCode } from '../../lib/paths';
 
-export const metadata = { title: 'Flashcards — WilliamsHub' };
+export const metadata = { title: 'cards' };
+
+// Mirrors the block deck in app/flashcards/block/[code]/page.tsx.
+const PER_MODULE = 2;
+const COLS = '84px minmax(0,1fr) 72px 72px 56px';
+const COLS_SM = '72px minmax(0,1fr) 40px';
 
 export default function FlashcardsLauncher() {
-  const subjects = Object.entries(lecturesBySubject)
+  const blocks = Object.entries(lecturesBySubject)
     .map(([code, mods]) => {
       const s = subjectByCode[code];
-      return { code, name: s?.name ?? code, slug: subjectSlug(code), year: s?.year ?? 0, topics: mods.length };
+      return {
+        code,
+        name: s?.name ?? code,
+        slug: subjectSlug(code),
+        year: s?.year ?? 0,
+        yearLabel: s?.yearLabel ?? '',
+        modules: mods.length,
+        deck: buildFlashcards(mods, PER_MODULE).length,
+        all: buildFlashcards(mods).length,
+      };
     })
     .sort((a, b) => a.year - b.year || a.code.localeCompare(b.code));
-
-  const byYear = subjects.reduce<Record<number, typeof subjects>>((acc, s) => {
-    (acc[s.year] ??= []).push(s);
-    return acc;
-  }, {});
+  const years = [...new Set(blocks.map((b) => b.year))];
+  const total = blocks.reduce((n, b) => n + b.all, 0);
 
   return (
-    <main className="mx-auto max-w-4xl px-5 py-8">
-      <header className="mb-8">
-        <div className="flex items-center gap-3">
-          <LiverySlashes />
-          <span className="eyebrow">Active recall</span>
-        </div>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--ink)]">Flashcards</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted)]">
-          Active-recall cards built from your modules — high-yield points, exam traps, findings and mnemonics. Pick a
-          block, or open any module and hit{' '}
-          <span className="inline-flex items-center gap-1 font-medium text-[var(--ink)]"><HubIcon name="cards" className="inline-block" /> Cards</span>.
-          Reveal, grade yourself, and keep your streak.
-        </p>
-      </header>
+    <Page crumbs={[{ label: 'cards' }]} aside={<span>{total.toLocaleString('en-US')} cards indexed</span>}>
+      <PageHeader
+        kicker={
+          <>
+            <strong>cards</strong>
+            <span>active recall</span>
+          </>
+        }
+        title="Cards"
+        lede="Recall decks built from module content: high-yield points, exam traps, findings, mechanisms and mnemonics. A block deck takes the two highest-value cards from each module and reshuffles every run; every module also has its full deck."
+      >
+        <Meta
+          className="mt-5"
+          rows={[
+            ['cards', `${total.toLocaleString('en-US')} across ${blocks.length} blocks`],
+            ['reviewed', <LiveCount key="c" of="cards" />],
+            ['keys', 'space reveal · 1 again · 2 good'],
+          ]}
+        />
+      </PageHeader>
 
-      {Object.entries(byYear)
-        .sort(([a], [b]) => Number(a) - Number(b))
-        .map(([year, subs]) => (
-          <section key={year} className="mb-8">
-            <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
-              {Number(year) > 0 ? `Year ${year}` : 'Other'}
-            </h2>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {subs.map((s) => (
-                <Link
-                  key={s.code}
-                  href={`/flashcards/block/${s.slug}`}
-                  className="clay-node clay-surface group flex flex-col gap-1.5 p-4 transition hover:border-[var(--accent)]"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-[11px] font-medium tracking-wide text-[var(--accent)]">{s.code}</span>
-                    <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">
-                      {s.topics} topics
+      <div className="rows" style={{ ['--cols-lg' as string]: COLS, ['--cols-sm' as string]: COLS_SM }}>
+        <div className="row row-head [--cols:var(--cols-sm)] sm:[--cols:var(--cols-lg)]">
+          <span>id</span>
+          <span>block deck</span>
+          <span className="hidden text-right sm:block">modules</span>
+          <span className="hidden text-right sm:block">cards</span>
+          <span />
+        </div>
+        {years.map((year) => (
+          <Fragment key={year}>
+            <div className="row row-group">{year > 0 ? `${yearCode(year, blocks.find((b) => b.year === year)?.yearLabel)} · ${blocks.find((b) => b.year === year)?.yearLabel.toLowerCase()}` : 'other'}</div>
+            {blocks
+              .filter((b) => b.year === year)
+              .map((b) => (
+                <Link key={b.code} href={`/flashcards/block/${b.slug}`} className="row group [--cols:var(--cols-sm)] sm:[--cols:var(--cols-lg)]">
+                  <span className="cell-id">{b.code}</span>
+                  <span className="cell-title">
+                    <span className="block truncate">{b.name}</span>
+                    <span className="cell-sub sm:hidden">
+                      {b.deck} cards · {b.modules} modules
                     </span>
-                  </div>
-                  <div className="text-[15px] font-medium text-[var(--ink)] transition group-hover:text-[var(--accent)]">
-                    {s.name}
-                  </div>
+                  </span>
+                  <span className="cell-num hidden sm:block">{b.modules}</span>
+                  <span className="cell-num hidden sm:block">{b.deck}</span>
+                  <span className="cell-go">
+                    <span className="hidden opacity-0 transition-opacity group-hover:opacity-100 sm:inline">load </span>
+                    <span className="cmd-arrow">→</span>
+                  </span>
                 </Link>
               ))}
-            </div>
-          </section>
+          </Fragment>
         ))}
-
-      <footer className="mt-10 text-center text-xs text-[var(--muted)]">
-        WilliamsHub · M-8 · a VESTRIPPN3.0 satellite
-      </footer>
-    </main>
+      </div>
+      <p className="mt-3 font-mono text-[11px] text-fg-3"># single-module decks: open any module and choose cards →</p>
+    </Page>
   );
 }

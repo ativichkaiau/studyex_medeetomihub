@@ -1,5 +1,7 @@
 # WilliamsHub (M-8) — Design Doc
 
+> Original pedagogical and product brief. For the current studyex interface and route structure, see [docs/redesign.md](docs/redesign.md) and [README.md](README.md).
+
 A VEStriPPN satellite. Turns **actual MedCMU lectures** into high-yield, mechanism-driven,
 exam-focused pages. **Supplements OnePagers, never replaces them.** Studying = building;
 building = studying.

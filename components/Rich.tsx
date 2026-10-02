@@ -1,7 +1,7 @@
 import Link from 'next/link';
 
 // Inline renderer for content bullets. Handles three inline syntaxes:
-//   **bold**        → amber "highlighter" mark (works in light + dark)
+//   **bold**        → a quiet highlighter mark (.hl in globals.css)
 //   *italic*        → emphasis (e.g. species / Latin names, book titles)
 //   [[module-id]]   → internal cross-link to /lecture/module-id (shown de-kebabed)
 // The *italic* delimiters are markdown-flanked — the opening * may not be
@@ -9,8 +9,7 @@ import Link from 'next/link';
 // intra-token stars like "HLA-B*57:01" or "T2*" stay literal and never italicise.
 // Anything else (lone *, _italic_, [[id|alias]], **[[id]]**) is rejected at build
 // time by content:verify, so only these three shapes ever reach the page.
-// Server-safe (no client JS). box-decoration-clone keeps the marker tidy when a
-// term wraps across lines.
+// Server-safe (no client JS).
 export function Rich({ text }: { text: string }) {
   const parts = text.split(
     /(\*\*[^*]+\*\*|(?<![A-Za-z0-9])\*(?!\s)[^*]+?(?<!\s)\*(?![A-Za-z0-9])|\[\[[a-z0-9-]+\]\])/g,
@@ -20,10 +19,7 @@ export function Rich({ text }: { text: string }) {
       {parts.map((p, i) => {
         if (p.startsWith('**') && p.endsWith('**')) {
           return (
-            <mark
-              key={i}
-              className="box-decoration-clone rounded bg-amber-200/70 px-1 font-semibold text-slate-900 dark:bg-amber-400/25 dark:text-amber-50"
-            >
+            <mark key={i} className="hl">
               {p.slice(2, -2)}
             </mark>
           );
@@ -38,11 +34,7 @@ export function Rich({ text }: { text: string }) {
         if (p.startsWith('[[') && p.endsWith(']]')) {
           const id = p.slice(2, -2);
           return (
-            <Link
-              key={i}
-              href={`/lecture/${id}`}
-              className="underline decoration-dotted underline-offset-2 text-sky-700 hover:text-sky-900 dark:text-sky-300 dark:hover:text-sky-100"
-            >
+            <Link key={i} href={`/lecture/${id}`} className="xref">
               {id.replace(/-/g, ' ')}
             </Link>
           );

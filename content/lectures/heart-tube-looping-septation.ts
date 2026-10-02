@@ -49,7 +49,7 @@ export const heartTubeLoopingSeptation: Lecture = {
   ],
 
   treatment: [
-    { logic: 'Why it matters', detail: 'Septation errors cause the congenital heart diseases (VSD, ASD, ToF, TGA) — several of which WilliamsHub covers in HCVS-2 ([[vsd]], [[asd]], [[tetralogy-of-fallot]]). Neural-crest involvement links to DiGeorge (22q11). The fetal shunts and their closure: [[fetal-circulation-shunts]].' },
+    { logic: 'Why it matters', detail: 'Septation errors cause the congenital heart diseases (VSD, ASD, ToF, TGA) — several of which studyex_medeetomihub covers in HCVS-2 ([[vsd]], [[asd]], [[tetralogy-of-fallot]]). Neural-crest involvement links to DiGeorge (22q11). The fetal shunts and their closure: [[fetal-circulation-shunts]].' },
   ],
 
   mnemonics: [

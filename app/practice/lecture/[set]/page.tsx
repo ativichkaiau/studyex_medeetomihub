@@ -1,8 +1,13 @@
-import Link from 'next/link';
 import { notFound, permanentRedirect } from 'next/navigation';
 import { lectureSets, lectureSetBySlug, lectureSetRedirects, subjectOfSource, subjectSlug, subjectByCode } from '../../../../content';
 import { getModuleBank } from '../../../../lib/questions/bank';
 import PracticeSession from '../../../../components/PracticeSession';
+import SessionConfig from '../../../../components/SessionConfig';
+import Page from '../../../../components/ui/Page';
+import { lectureCode, lectureName } from '../../../../lib/paths';
+
+// Every valid page is generated at build time; anything else is a real 404.
+export const dynamicParams = false;
 
 export function generateStaticParams() {
   return lectureSets.map((s) => ({ set: s.slug }));
@@ -10,7 +15,7 @@ export function generateStaticParams() {
 
 export function generateMetadata({ params }: { params: { set: string } }) {
   const s = lectureSetBySlug[lectureSetRedirects[params.set] ?? params.set];
-  return { title: s ? `Practice: ${s.source} — WilliamsHub` : 'Practice — WilliamsHub' };
+  return { title: s ? `practice: ${s.source}` : 'practice' };
 }
 
 export default function LecturePracticePage({ params }: { params: { set: string } }) {
@@ -23,32 +28,27 @@ export default function LecturePracticePage({ params }: { params: { set: string 
   const subjectCode = subjectOfSource[set.source] ?? 'unknown';
   const unit = subjectByCode[subjectCode]?.yearLabel === 'Reference' ? 'chapter' : 'lecture';
   const subjectOf = Object.fromEntries(set.items.map((m) => [m.id, subjectCode]));
-  const backHref = subjectCode !== 'unknown' ? `/practice/block/${subjectSlug(subjectCode)}` : '/practice';
+  const known = subjectCode !== 'unknown';
+  const code = lectureCode(set.source);
 
   return (
-    <main className="mx-auto max-w-3xl px-5 py-8">
-      <Link
-        href={backHref}
-        className="text-sm text-slate-500 transition hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
-      >
-        ← {subjectCode !== 'unknown' ? subjectCode : 'Practice'}
-      </Link>
-
-      <header className="mb-6 mt-4">
-        <div className="livery-stripe mb-4 h-1.5 w-full rounded-full" />
-        <div className="text-xs font-bold uppercase tracking-wide text-[#1e5bd6] dark:text-[#7AA0FF]">Practice · {unit}</div>
-        <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-900 dark:text-white">{set.source}</h1>
-        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-          {questions.length.toLocaleString()} question{questions.length === 1 ? '' : 's'} across {set.items.length} topic
-          {set.items.length === 1 ? '' : 's'} in this {unit} — up to 20 random per session.
-        </p>
-      </header>
-
+    <Page
+      crumbs={[
+        { label: 'practice', href: '/practice' },
+        ...(known ? [{ label: subjectCode, href: `/practice/block/${subjectSlug(subjectCode)}` }] : []),
+        { label: code },
+      ]}
+      width="w-doc"
+    >
+      <SessionConfig
+        scope={known ? `${subjectCode}/${code}` : code}
+        title={lectureName(set.source)}
+        pool={questions.length}
+        modules={set.items.length}
+        mode={`${unit} · every module in it`}
+        back={{ href: `/lecture-set/${params.set}`, label: `back to ${unit}` }}
+      />
       <PracticeSession questions={questions} title={set.source} subjectOf={subjectOf} />
-
-      <footer className="mt-10 text-center text-xs text-slate-400 dark:text-slate-500">
-        WilliamsHub · M-8 · a VESTRIPPN3.0 satellite
-      </footer>
-    </main>
+    </Page>
   );
 }

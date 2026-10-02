@@ -1,4 +1,4 @@
-// WilliamsPod connector — the WilliamsHub side of the live bridge. The browser
+// WilliamsPod connector — the Hub (studyex_medeetomihub) side of the live bridge. The browser
 // PULLS the user's telemetry from WilliamsPod's token-gated CORS export and
 // ingests it into the localStorage repair queue. SSR-safe.
 //

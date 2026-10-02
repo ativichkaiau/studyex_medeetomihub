@@ -1,30 +1,35 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
-import { createPortal } from 'react-dom';
+import Dialog from './ui/Dialog';
 import { useRouter } from 'next/navigation';
-import HubIcon from './HubIcon';
+import { NAV } from './shell/nav';
+import { SEARCH_OPEN_EVENT, openAsk, openShortcuts } from '../lib/events';
+import { setAppearance } from '../lib/appearance';
+import { setMotion } from '../lib/motion';
+import { loadSearchIndex, moduleEntries, type IndexEntry } from '../lib/searchIndex';
+import { getVisited } from '../lib/user/activity';
+import { getActivity } from '../lib/user/eventLog';
+import { lectureCode, lectureName } from '../lib/paths';
 
-// ⌘K global search over the whole curriculum. The compact index is fetched once
-// on first open (public/search-index.json) so no content ships in the JS bundle.
+// ⌘K — search the whole index and run commands. Empty, it lists commands and
+// the modules you opened last; typing filters both; a leading ">" keeps it to
+// commands. The index is fetched on first open (public/search-index.json), so
+// no content ships in the bundle.
 
-interface Entry {
-  k: 'm' | 'l' | 's' | 'f';
-  t: string;
-  u: string;
-  s?: string | null;
-  sub?: string;
-  tg?: string;
+interface Command {
+  id: string;
+  label: string;
+  hint: string;
+  keys?: string;
+  run: () => void;
 }
 
-const KIND: Record<Entry['k'], { label: string; cls: string }> = {
-  m: { label: 'Module', cls: 'bg-[#2e5bff]/12 text-[#1e5bd6] dark:text-[#7AA0FF]' },
-  l: { label: 'Lecture', cls: 'bg-indigo-500/12 text-indigo-600 dark:text-indigo-300' },
-  s: { label: 'Block', cls: 'bg-amber-500/15 text-amber-700 dark:text-amber-300' },
-  f: { label: 'Framework', cls: 'bg-teal-500/12 text-teal-700 dark:text-teal-300' },
-};
+type Item = { kind: 'command'; command: Command } | { kind: 'entry'; entry: IndexEntry };
 
-function scoreEntry(e: Entry, tokens: string[]): number {
+const GROUP_LABEL: Record<IndexEntry['k'], string> = { s: 'blocks', l: 'lectures', m: 'modules', f: 'chapters' };
+
+function scoreEntry(e: IndexEntry, tokens: string[]): number {
   const title = e.t.toLowerCase();
   const hay = `${e.t} ${e.s ?? ''} ${e.sub ?? ''} ${e.tg ?? ''}`.toLowerCase();
   let score = 0;
@@ -41,190 +46,278 @@ function scoreEntry(e: Entry, tokens: string[]): number {
   return score - e.t.length * 0.04; // prefer concise titles
 }
 
+/** The structural context printed above a result: HCVS-2 / L04. */
+function contextOf(e: IndexEntry): string {
+  if (e.k === 's') return e.s ?? 'block';
+  if (e.k === 'l') return [e.s, lectureCode(e.t)].filter(Boolean).join(' / ');
+  if (e.k === 'f') return [e.s, lectureCode(e.t)].filter(Boolean).join(' / ');
+  return [e.s, e.sub ? lectureCode(e.sub) : null].filter(Boolean).join(' / ');
+}
+
+function titleOf(e: IndexEntry): string {
+  if (e.k === 's') return e.t.split(' — ').slice(1).join(' — ') || e.t;
+  if (e.k === 'l' || e.k === 'f') return lectureName(e.t);
+  return e.t;
+}
+
 export default function CommandPalette() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
-  const [index, setIndex] = useState<Entry[] | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [index, setIndex] = useState<IndexEntry[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [recent, setRecent] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => setMounted(true), []);
 
   const load = useCallback(() => {
-    if (index || loading) return;
-    setLoading(true);
-    fetch('/search-index.json')
-      .then((r) => r.json())
-      .then((data: Entry[]) => setIndex(data))
-      .catch(() => setIndex([]))
-      .finally(() => setLoading(false));
-  }, [index, loading]);
+    setFailed(false);
+    loadSearchIndex()
+      .then(setIndex)
+      .catch(() => setFailed(true));
+  }, []);
 
-  const openPalette = useCallback(() => {
+  const show = useCallback(() => {
     setOpen(true);
     load();
   }, [load]);
 
-  // Global ⌘K / Ctrl-K, and Esc to close.
+  const close = useCallback(() => {
+    setOpen(false);
+  }, []);
+
+  // ⌘K / Ctrl-K toggles from anywhere; the shell opens it by event.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        setOpen((o) => {
-          if (!o) load();
-          return !o;
-        });
-      } else if (e.key === 'Escape') {
-        setOpen(false);
+        if (open) close();
+        else show();
       }
     };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [load]);
+    window.addEventListener(SEARCH_OPEN_EVENT, show);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener(SEARCH_OPEN_EVENT, show);
+    };
+  }, [open, show, close]);
 
   useEffect(() => {
-    if (open) {
-      setQuery('');
-      setActive(0);
-      requestAnimationFrame(() => inputRef.current?.focus());
-    }
+    if (!open) return;
+    setQuery('');
+    setActive(0);
+    // Most recent first, de-duplicated: the activity log, then older coverage.
+    const opened = getActivity()
+      .filter((e) => e.type === 'module.open' && e.ref)
+      .map((e) => e.ref as string)
+      .reverse();
+    const visited = [...getVisited()].reverse();
+    setRecent([...new Set([...opened, ...visited])].slice(0, 5));
   }, [open]);
 
-  const results = useMemo(() => {
-    if (!index) return [];
-    const tokens = query.toLowerCase().trim().split(/\s+/).filter(Boolean);
-    if (tokens.length === 0) return [];
-    return index
-      .map((e) => ({ e, score: scoreEntry(e, tokens) }))
-      .filter((x) => x.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 40)
-      .map((x) => x.e);
-  }, [index, query]);
+  const commands: Command[] = useMemo(() => {
+    const go = (href: string) => () => router.push(href);
+    return [
+      ...NAV.map((item) => ({ id: `go-${item.label}`, label: `go ${item.label}`, hint: item.hint, keys: `g ${item.key}`, run: go(item.href) })),
+      { id: 'go-onepagers', label: 'go onepagers', hint: 'the OnePager archive', run: go('/library/onepagers') },
+      { id: 'ask', label: 'ask tutor', hint: 'open the study tutor', keys: '⌘J', run: () => openAsk() },
+      { id: 'theme-auto', label: 'theme auto', hint: 'follow local time', run: () => setAppearance('auto') },
+      { id: 'theme-light', label: 'theme light', hint: 'always light', run: () => setAppearance('light') },
+      { id: 'theme-dark', label: 'theme dark', hint: 'always dark', run: () => setAppearance('dark') },
+      { id: 'motion-on', label: 'motion on', hint: 'enable transitions', run: () => setMotion(true) },
+      { id: 'motion-off', label: 'motion off', hint: 'disable transitions', run: () => setMotion(false) },
+      { id: 'keys', label: 'keyboard shortcuts', hint: 'list every binding', keys: '?', run: () => openShortcuts() },
+    ];
+  }, [router]);
+
+  const groups = useMemo(() => {
+    const raw = query.trim().toLowerCase();
+    const commandOnly = raw.startsWith('>');
+    const text = commandOnly ? raw.slice(1).trim() : raw;
+    const tokens = text.split(/\s+/).filter(Boolean);
+    const out: { label: string; items: Item[] }[] = [];
+
+    const matched = tokens.length ? commands.filter((c) => tokens.every((t) => `${c.label} ${c.hint}`.includes(t))) : commands;
+
+    if (!tokens.length && !commandOnly) {
+      if (index && recent.length) {
+        const byId = moduleEntries(index);
+        const items = recent.map((id) => byId[id]).filter(Boolean).map((entry) => ({ kind: 'entry' as const, entry }));
+        if (items.length) out.push({ label: 'recent', items });
+      }
+      out.push({ label: 'commands', items: matched.map((command) => ({ kind: 'command' as const, command })) });
+      return out;
+    }
+    if (commandOnly) {
+      out.push({ label: 'commands', items: matched.map((command) => ({ kind: 'command' as const, command })) });
+      return out;
+    }
+
+    if (matched.length) out.push({ label: 'commands', items: matched.slice(0, 4).map((command) => ({ kind: 'command' as const, command })) });
+    if (index) {
+      const hits = index
+        .map((e) => ({ e, score: scoreEntry(e, tokens) }))
+        .filter((x) => x.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 40)
+        .map((x) => x.e);
+      for (const k of ['s', 'l', 'm', 'f'] as const) {
+        const items = hits.filter((e) => e.k === k).map((entry) => ({ kind: 'entry' as const, entry }));
+        if (items.length) out.push({ label: GROUP_LABEL[k], items });
+      }
+    }
+    return out;
+  }, [query, commands, index, recent]);
+
+  const flat = useMemo(() => groups.flatMap((g) => g.items), [groups]);
 
   useEffect(() => setActive(0), [query]);
 
-  const go = useCallback(
-    (u: string) => {
+  const run = useCallback(
+    (item: Item | undefined) => {
+      if (!item) return;
       setOpen(false);
-      router.push(u);
+      if (item.kind === 'command') requestAnimationFrame(item.command.run);
+      else router.push(item.entry.u);
     },
     [router],
   );
 
-  const onListKey = (e: ReactKeyboardEvent) => {
+  const onKeyDown = (e: ReactKeyboardEvent) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setActive((a) => Math.min(a + 1, results.length - 1));
+      setActive((a) => Math.max(0, Math.min(a + 1, flat.length - 1)));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setActive((a) => Math.max(a - 1, 0));
-    } else if (e.key === 'Enter' && results[active]) {
+    } else if (e.key === 'Home') {
       e.preventDefault();
-      go(results[active].u);
+      setActive(0);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      setActive(Math.max(0, flat.length - 1));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      run(flat[active]);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      close();
     }
   };
 
-  // keep the active row in view
+  // Keep the active row in view.
   useEffect(() => {
     listRef.current?.querySelector('[data-active="true"]')?.scrollIntoView({ block: 'nearest' });
-  }, [active, results]);
+  }, [active, groups]);
+
+  if (!mounted || !open) return null;
+
+  const searching = query.trim() !== '' && !query.trim().startsWith('>');
+  let n = -1;
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={openPalette}
-        aria-label="Search (Command K)"
-        className="header-tool"
-      >
-        <HubIcon name="search" />
-        <span className="hidden xl:inline">Search</span>
-        <kbd className="shortcut hidden lg:inline">
-          ⌘K
-        </kbd>
-      </button>
+    <Dialog label="Search and commands" onClose={close}>
+        <div className="dialog-head">
+          <span aria-hidden="true" className="text-accent">
+            &gt;
+          </span>
+          <input
+            ref={inputRef}
+            data-autofocus
+            onKeyDown={onKeyDown}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="search blocks, lectures, modules…  (> for commands)"
+            className="palette-input"
+            role="combobox"
+            aria-expanded="true"
+            aria-controls="palette-results"
+            aria-activedescendant={flat[active] ? `palette-item-${active}` : undefined}
+            aria-label="Search"
+            autoComplete="off"
+            spellCheck={false}
+          />
+          <button type="button" className="kbd" onClick={close} aria-label="Close">
+            esc
+          </button>
+        </div>
 
-      {mounted && open
-        ? createPortal(
-            <div
-              className="modal-backdrop fixed inset-0 z-[100] flex items-start justify-center bg-slate-900/40 px-4 pt-[12vh] backdrop-blur-sm"
-              onClick={() => setOpen(false)}
-              role="dialog"
-              aria-modal="true"
-              aria-label="Search"
-            >
-              <div
-                className="clay clay-surface modal-panel w-full max-w-xl overflow-hidden p-0"
-                onClick={(e) => e.stopPropagation()}
-                onKeyDown={onListKey}
-              >
-                <div className="livery-stripe h-0.5 w-full" />
-                <div className="flex items-center gap-2 px-4 py-3">
-                  <HubIcon name="search" className="text-slate-400" />
-                  <input
-                    ref={inputRef}
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Search modules, lectures, blocks, frameworks…"
-                    className="w-full bg-transparent text-[15px] text-slate-900 outline-none placeholder:text-slate-400 dark:text-white"
-                  />
-                  <kbd className="rounded bg-black/5 px-1.5 py-0.5 text-[10px] font-bold text-slate-400 dark:bg-white/10">
-                    esc
-                  </kbd>
-                </div>
+        <div ref={listRef} id="palette-results" role="listbox" aria-label="Search results" className="min-h-[120px] flex-1 overflow-y-auto pb-2">
+          {searching && !index && !failed ? (
+            <p className="px-4 py-6 font-mono text-[12px] text-fg-3">loading index…</p>
+          ) : null}
+          {failed ? (
+            <div className="px-4 py-6 font-mono text-[12px] text-fg-3">
+              <p className="text-danger">INDEX_UNAVAILABLE</p>
+              <p className="mt-1">the search index could not be fetched.</p>
+              <button type="button" onClick={load} className="cmd mt-3">
+                retry →
+              </button>
+            </div>
+          ) : null}
+          {flat.length === 0 && (!searching || index) ? (
+            <p role="status" className="px-4 py-6 font-mono text-[12px] text-fg-3">
+              No {query.trim().startsWith('>') ? 'commands' : 'results'} for “{query.trim()}”
+            </p>
+          ) : null}
+          {groups.map((group) => (
+            <div key={group.label} role="group" aria-label={group.label}>
+              <div className="palette-group">{group.label}</div>
+              {group.items.map((item) => {
+                n += 1;
+                const i = n;
+                const isActive = i === active;
+                return (
+                  <button
+                    key={item.kind === 'command' ? item.command.id : `${item.entry.k}:${item.entry.u}`}
+                    id={`palette-item-${i}`}
+                    type="button"
+                    role="option"
+                    tabIndex={-1}
+                    aria-selected={isActive}
+                    data-active={isActive}
+                    onMouseMove={() => setActive(i)}
+                    onClick={() => run(item)}
+                    className="palette-item"
+                  >
+                    {item.kind === 'command' ? (
+                      <>
+                        <span className="min-w-0">
+                          <span className="block font-mono text-[13px] text-fg">{item.command.label}</span>
+                          <span className="palette-ctx block truncate">{item.command.hint}</span>
+                        </span>
+                        {item.command.keys ? <span className="kbd">{item.command.keys}</span> : null}
+                      </>
+                    ) : (
+                      <>
+                        <span className="min-w-0">
+                          <span className="palette-ctx block truncate">{contextOf(item.entry)}</span>
+                          <span className="palette-title block">{titleOf(item.entry)}</span>
+                        </span>
+                        <span className="font-mono text-[10.5px] uppercase tracking-[0.08em] text-fg-3">
+                          {item.entry.k === 's' ? 'block' : item.entry.k === 'l' ? 'lecture' : item.entry.k === 'f' ? 'chapter' : 'module'}
+                        </span>
+                      </>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
 
-                <div ref={listRef} className="max-h-[52vh] overflow-y-auto border-t border-black/5 px-2 py-2 dark:border-white/10">
-                  {loading && !index ? (
-                    <div className="px-3 py-6 text-center">
-                      <span className="livery-slide mx-auto block h-1 w-32 rounded-full" aria-hidden="true" />
-                      <p className="mt-3 text-sm text-slate-400">Loading index…</p>
-                    </div>
-                  ) : query.trim() === '' ? (
-                    <p className="px-3 py-6 text-center text-sm text-slate-400">
-                      Type to search every module, lecture, block and framework.
-                    </p>
-                  ) : results.length === 0 ? (
-                    <p className="px-3 py-6 text-center text-sm text-slate-400">No matches for “{query}”.</p>
-                  ) : (
-                    results.map((r, i) => (
-                      <button
-                        key={r.u}
-                        type="button"
-                        data-active={i === active}
-                        onMouseEnter={() => setActive(i)}
-                        onClick={() => go(r.u)}
-                        className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left transition ${
-                          i === active ? 'clay-node clay-surface' : ''
-                        }`}
-                      >
-                        <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${KIND[r.k].cls}`}>
-                          {r.k === 'l' && r.t.startsWith('Ch ') ? 'Chapter' : KIND[r.k].label}
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-semibold text-slate-900 dark:text-white">{r.t}</span>
-                          {r.sub ? (
-                            <span className="block truncate text-[11px] text-slate-400 dark:text-slate-500">{r.sub}</span>
-                          ) : null}
-                        </span>
-                        {r.s ? (
-                          <span className="shrink-0 rounded bg-black/5 px-1 py-0.5 text-[10px] font-medium text-slate-500 dark:bg-white/10 dark:text-slate-400">
-                            {r.s}
-                          </span>
-                        ) : null}
-                      </button>
-                    ))
-                  )}
-                </div>
-              </div>
-            </div>,
-            document.body,
-          )
-        : null}
-    </>
+        <div className="palette-foot">
+          <span>↑↓ move</span>
+          <span>↵ open</span>
+          <span>&gt; commands</span>
+          <span>esc close</span>
+          {index ? <span className="ml-auto">{index.length.toLocaleString('en-US')} records</span> : null}
+        </div>
+    </Dialog>
   );
 }

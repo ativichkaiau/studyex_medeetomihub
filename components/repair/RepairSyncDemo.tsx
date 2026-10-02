@@ -4,7 +4,7 @@ import { handleSyncEnvelope } from '../../lib/sync/williamsSync';
 import type { PodTelemetryPayload } from '../../lib/sync/types';
 
 // DEV-ONLY helper: simulate a WilliamsPod session arriving through WilliamsSync,
-// so the repair queue can be exercised before WilliamsPod exists. The page only
+// so the repair queue can be exercised without a live Pod. The page only
 // renders this outside production.
 const SAMPLE: PodTelemetryPayload = {
   user_id: 'local',
@@ -28,9 +28,9 @@ export default function RepairSyncDemo() {
         window.alert(`WilliamsSync: queued ${r.queued} repair item(s).`);
         window.location.reload();
       }}
-      className="clay-pill px-3 py-1.5 text-xs font-semibold text-slate-500 transition hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"
+      className="btn btn-sm"
     >
-      ⤓ Simulate a WilliamsPod sync (dev)
+      simulate a williamspod sync (dev)
     </button>
   );
 }

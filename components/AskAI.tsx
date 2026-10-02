@@ -1,12 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import Dialog from './ui/Dialog';
 import { usePathname } from 'next/navigation';
-import HubIcon from './HubIcon';
+import { ASK_OPEN_EVENT } from '../lib/events';
+import { snake } from '../lib/paths';
 
-// Global "Ask AI" study tutor (⌘J). Streams from /api/ask, where the OpenAI key
-// lives server-side. On a /lecture/<id> page it passes moduleId so answers are
+// Global study tutor (⌘J). Streams from /api/ask, where the OpenAI key lives
+// server-side. On a /lecture/<id> page it passes moduleId so answers are
 // grounded in the module the student is reading.
 
 type Msg = { role: 'user' | 'assistant'; content: string };
@@ -28,7 +29,7 @@ function RichText({ text }: { text: string }) {
     <>
       {text.split(/(\*\*[^*]+\*\*)/g).map((p, i) =>
         p.startsWith('**') && p.endsWith('**') ? (
-          <strong key={i} className="font-semibold text-slate-900 dark:text-white">
+          <strong key={i} className="font-semibold text-fg">
             {p.slice(2, -2)}
           </strong>
         ) : (
@@ -54,27 +55,24 @@ export default function AskAI() {
   useEffect(() => setMounted(true), []);
 
   const moduleId = pathname?.startsWith('/lecture/') ? decodeURIComponent(pathname.slice('/lecture/'.length)) : undefined;
-  const moduleLabel = moduleId?.replace(/-/g, ' ');
 
-  // ⌘J / Ctrl-J toggles; Esc closes.
+  // ⌘J / Ctrl-J toggles; the dialog handles dismissal and focus.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'j') {
         e.preventDefault();
         setOpen((o) => !o);
-      } else if (e.key === 'Escape') {
-        setOpen(false);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  // Opened from a lecture page's "Ask" button (components/AskAboutButton.tsx).
+  // Opened from a page's "ask" button or the status bar.
   useEffect(() => {
     const openEvt = () => setOpen(true);
-    window.addEventListener('williamshub:ask-ai', openEvt);
-    return () => window.removeEventListener('williamshub:ask-ai', openEvt);
+    window.addEventListener(ASK_OPEN_EVENT, openEvt);
+    return () => window.removeEventListener(ASK_OPEN_EVENT, openEvt);
   }, []);
 
   // Restore the conversation on load, then keep it in sync (survives navigation).
@@ -97,11 +95,7 @@ export default function AskAI() {
   }, [messages, streaming]);
 
   useEffect(() => {
-    if (open) requestAnimationFrame(() => inputRef.current?.focus());
-  }, [open]);
-
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages, streaming]);
 
   const send = useCallback(
@@ -141,7 +135,7 @@ export default function AskAI() {
       } catch (e) {
         if ((e as Error).name !== 'AbortError') {
           setError((e as Error).message);
-          setMessages((prev) => prev.slice(0, -1)); // drop the empty assistant bubble
+          setMessages((prev) => prev.slice(0, -1)); // drop the empty assistant turn
         }
       } finally {
         setStreaming(false);
@@ -162,113 +156,103 @@ export default function AskAI() {
 
   return (
     <>
+      {/* The desktop status bar carries its own trigger; this one is for touch. */}
       <button
         type="button"
         onClick={() => setOpen(true)}
-        aria-label="Ask AI (Command J)"
-        className="clay-pill tutor-trigger fixed bottom-5 right-5 z-40 inline-flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-[var(--accent)] transition hover:border-[var(--accent)]"
+        aria-label="Ask the tutor"
+        className="btn no-print fixed bottom-4 right-4 z-30 h-10 shadow-[var(--shadow-overlay)] lg:hidden"
       >
-        <HubIcon name="sparkles" />
-        <span className="hidden sm:inline">Ask AI</span>
-        <kbd className="shortcut hidden sm:inline">
-          ⌘J
-        </kbd>
+        ask
       </button>
 
       {mounted && open
-        ? createPortal(
-            <div
-              className="modal-backdrop fixed inset-0 z-[100] flex items-start justify-center bg-slate-900/40 px-4 pt-[10vh] backdrop-blur-sm"
-              onClick={() => setOpen(false)}
-              role="dialog"
-              aria-modal="true"
-              aria-label="Ask AI"
-            >
-              <div
-                className="clay clay-surface modal-panel flex w-full max-w-2xl flex-col overflow-hidden p-0"
-                style={{ maxHeight: '78vh' }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="livery-stripe h-0.5 w-full" />
-
-                {/* header */}
-                <div className="flex items-center gap-2 border-b border-black/5 px-4 py-3 dark:border-white/10">
-                  <HubIcon name="sparkles" />
-                  <span className="text-sm font-semibold text-slate-900 dark:text-white">Ask AI</span>
-                  {moduleLabel ? (
-                    <span className="ml-1 truncate rounded bg-[#2e5bff]/12 px-2 py-0.5 text-[11px] font-medium text-[#1e5bd6] dark:text-[#7AA0FF]">
-                      grounded in: {moduleLabel}
+        ? (
+            <Dialog label="Ask the tutor" onClose={() => setOpen(false)} className="max-w-2xl">
+                <div className="dialog-head">
+                  <span className="uppercase">ask</span>
+                  <span className="text-fg-3">//</span>
+                  <span className="uppercase text-fg">tutor</span>
+                  {moduleId ? (
+                    <span className="tag tag-accent ml-1 max-w-[46%] truncate normal-case" title="Answers are grounded in this module">
+                      context: {snake(moduleId)}
                     </span>
                   ) : null}
                   <span className="flex-1" />
                   {messages.length > 0 ? (
-                    <button
-                      type="button"
-                      onClick={reset}
-                      className="rounded px-2 py-0.5 text-[11px] font-semibold text-slate-400 transition hover:text-slate-600 dark:hover:text-slate-200"
-                    >
-                      Clear
+                    <button type="button" onClick={reset} className="btn btn-ghost btn-sm">
+                      clear
                     </button>
                   ) : null}
-                  <kbd className="rounded bg-black/5 px-1.5 py-0.5 text-[10px] font-bold text-slate-400 dark:bg-white/10">esc</kbd>
+                  <button type="button" onClick={() => setOpen(false)} className="kbd" aria-label="Close">
+                    esc
+                  </button>
                 </div>
 
-                {/* messages */}
-                <div ref={scrollRef} className="min-h-[220px] flex-1 space-y-3 overflow-y-auto px-4 py-4">
+                <div ref={scrollRef} className="min-h-[220px] flex-1 overflow-y-auto px-4 py-4">
                   {messages.length === 0 ? (
-                    <div className="pt-4 text-center">
-                      <p className="text-sm text-slate-400">
-                        Ask anything — {moduleId ? 'grounded in this module' : 'about any topic in your curriculum'}.
+                    <div>
+                      <p className="font-mono text-[12px] text-fg-3">
+                        {moduleId ? '# grounded in this module' : '# ask anything in your curriculum'}
                       </p>
-                      <div className="mt-4 flex flex-wrap justify-center gap-2">
+                      <div className="mt-3 grid gap-1">
                         {suggestions.map((s) => (
                           <button
                             key={s}
                             type="button"
                             onClick={() => send(s)}
-                            className="clay-pill px-3 py-1.5 text-[12px] font-medium text-slate-600 transition active:translate-y-px dark:text-slate-300"
+                            className="palette-item rounded-sm border-l-0 px-2 hover:bg-raised"
                           >
-                            {s}
+                            <span className="font-mono text-[13px] text-fg-2">
+                              <span className="text-accent">›</span> {s}
+                            </span>
                           </button>
                         ))}
                       </div>
                     </div>
                   ) : (
-                    messages.map((m, i) => (
-                      <div key={i} className={`chat-msg ${m.role === 'user' ? 'flex justify-end' : 'flex justify-start'}`}>
-                        <div
-                          className={
-                            m.role === 'user'
-                              ? 'max-w-[85%] rounded-2xl rounded-br-sm bg-[#2e5bff] px-3.5 py-2 text-sm text-white'
-                              : 'max-w-[90%] whitespace-pre-wrap rounded-2xl rounded-bl-sm bg-black/[0.04] px-3.5 py-2 text-sm leading-relaxed text-slate-700 dark:bg-white/[0.06] dark:text-slate-200'
-                          }
-                        >
-                          {m.role === 'assistant' ? (
-                            m.content ? (
-                              <RichText text={m.content} />
+                    <div className="grid gap-4">
+                      {messages.map((m, i) => (
+                        <div key={i} className="reveal-in grid gap-1.5">
+                          <span className={`font-mono text-[10.5px] uppercase tracking-[0.08em] ${m.role === 'user' ? 'text-accent' : 'text-fg-3'}`}>
+                            {m.role === 'user' ? 'you' : 'tutor'}
+                          </span>
+                          <div
+                            className={
+                              m.role === 'user'
+                                ? 'whitespace-pre-wrap rounded-sm border border-line bg-raised px-3 py-2 text-[14px] leading-relaxed text-fg'
+                                : 'whitespace-pre-wrap text-[14px] leading-relaxed text-fg-2'
+                            }
+                          >
+                            {m.role === 'assistant' ? (
+                              m.content ? (
+                                <RichText text={m.content} />
+                              ) : (
+                                <span className="font-mono text-[12px] text-fg-3">generating…</span>
+                              )
                             ) : (
-                              <span className="inline-flex gap-1 py-1 align-middle">
-                                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 [animation-delay:-0.2s]" />
-                                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 [animation-delay:-0.1s]" />
-                                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" />
-                              </span>
-                            )
-                          ) : (
-                            m.content
-                          )}
+                              m.content
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))
+                      ))}
+                    </div>
                   )}
                   {error ? (
-                    <p className="rounded-lg bg-[#e4002b]/10 px-3 py-2 text-[12px] text-[#e4002b] dark:text-[#ff5a72]">{error}</p>
+                    <div className="mt-4 border-l-2 border-danger bg-raised px-3 py-2 font-mono text-[12px]">
+                      <p className="text-danger">REQUEST_FAILED</p>
+                      <p className="mt-1 text-fg-2">{error}</p>
+                    </div>
                   ) : null}
                 </div>
 
-                {/* input */}
-                <div className="border-t border-black/5 px-3 py-3 dark:border-white/10">
-                  <div className="clay-inset flex items-end gap-2 p-2">
+                <div className="border-t border-line p-3">
+                  <div className="flex items-end gap-2 rounded-sm border border-line-strong bg-root px-2.5 py-2 focus-within:border-accent">
+                    <span aria-hidden="true" className="pb-[3px] font-mono text-[13px] text-accent">
+                      &gt;
+                    </span>
                     <textarea
+                      data-autofocus
                       ref={inputRef}
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
@@ -279,26 +263,24 @@ export default function AskAI() {
                         }
                       }}
                       rows={1}
-                      placeholder={moduleId ? 'Ask about this module…' : 'Ask a study question…'}
-                      className="max-h-32 min-h-[24px] flex-1 resize-none bg-transparent px-1 text-[14px] text-slate-900 outline-none placeholder:text-slate-400 dark:text-white"
+                      aria-label="Question"
+                      placeholder={moduleId ? 'ask about this module…' : 'ask a study question…'}
+                      className="max-h-32 min-h-[22px] flex-1 resize-none bg-transparent text-[14px] text-fg outline-none placeholder:font-mono placeholder:text-[12.5px] placeholder:text-fg-3"
                     />
                     <button
                       type="button"
                       onClick={() => send(input)}
                       disabled={!input.trim() || streaming}
-                      aria-label="Send"
-                      className="clay-pill shrink-0 rounded-lg px-3 py-1.5 text-[13px] font-semibold text-[#1e5bd6] transition active:translate-y-px disabled:opacity-40 dark:text-[#7AA0FF]"
+                      className="btn btn-sm"
                     >
-                      {streaming ? '…' : 'Send'}
+                      {streaming ? 'streaming…' : 'send ↵'}
                     </button>
                   </div>
-                  <p className="px-1 pt-1.5 text-[10px] text-slate-400">
-                    Educational revision support — verify against primary sources. Enter to send, Shift+Enter for a new line.
+                  <p className="px-1 pt-2 font-mono text-[10.5px] text-fg-3">
+                    revision support — verify against primary sources · enter send · shift+enter newline
                   </p>
                 </div>
-              </div>
-            </div>,
-            document.body,
+            </Dialog>
           )
         : null}
     </>

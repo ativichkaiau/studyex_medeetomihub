@@ -15,10 +15,12 @@ import type { Lecture } from '../../lib/types';
 export default function ConceptModeController({
   lecture,
   onePager,
+  toc = false,
   children,
 }: {
   lecture: Lecture;
   onePager: OnePagerSections;
+  toc?: boolean;
   children: React.ReactNode;
 }) {
   const [mode, setMode] = useState<ConceptDepth>('standard');
@@ -38,7 +40,7 @@ export default function ConceptModeController({
       {mode === 'standard' ? (
         children
       ) : (
-        <ConceptModeContentView lecture={lecture} mode={mode} onePager={onePager} />
+        <ConceptModeContentView lecture={lecture} mode={mode} onePager={onePager} toc={toc} />
       )}
     </>
   );

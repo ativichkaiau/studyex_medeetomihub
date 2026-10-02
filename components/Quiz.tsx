@@ -3,59 +3,43 @@
 import { useState } from 'react';
 import type { QuizQuestion } from '../lib/types';
 import { recordQuizAnswer } from '../lib/user/activity';
+import { logActivity } from '../lib/user/eventLog';
+import { pad2 } from '../lib/paths';
 
-function QuizItem({ q, moduleId }: { q: QuizQuestion; moduleId?: string }) {
+function QuizItem({ q, moduleId, n }: { q: QuizQuestion; moduleId?: string; n: number }) {
   const [chosen, setChosen] = useState<string | null>(null);
   const answered = chosen !== null;
 
   const choose = (id: string) => {
     setChosen(id);
-    if (moduleId) recordQuizAnswer(moduleId, q.id, id === q.answerId);
+    if (moduleId) {
+      recordQuizAnswer(moduleId, q.id, id === q.answerId);
+      logActivity({ type: 'recall.answer', ref: moduleId, n: 1, ok: id === q.answerId ? 1 : 0 });
+    }
   };
 
   return (
-    <div className="quiz-item clay-inset clay-surface p-4">
-      <p className="text-sm font-medium text-slate-900 dark:text-white">{q.stem}</p>
-      <div className="mt-3 space-y-2">
+    <div className="quiz-item panel p-4">
+      <p className="label mb-2">Q{pad2(n)}</p>
+      <p className="text-[15px] font-medium leading-relaxed text-fg">{q.stem}</p>
+      <div className="mt-3">
         {q.options.map((o) => {
           const isCorrect = o.id === q.answerId;
           const isChosen = o.id === chosen;
-          let cls = 'clay-node w-full text-left text-sm px-3 py-2 transition ';
-          if (!answered) {
-            cls += 'clay-surface text-slate-700 dark:text-slate-200 active:translate-y-px';
-          } else if (isCorrect) {
-            cls += 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/45 dark:text-emerald-100';
-          } else if (isChosen) {
-            cls += 'bg-rose-100 text-rose-900 dark:bg-rose-900/45 dark:text-rose-100';
-          } else {
-            cls += 'clay-surface text-slate-400 dark:text-slate-500';
-          }
+          const state = !answered ? undefined : isCorrect ? 'correct' : isChosen ? 'wrong' : 'dim';
           return (
-            <button
-              key={o.id}
-              type="button"
-              disabled={answered}
-              onClick={() => choose(o.id)}
-              className={cls}
-            >
-              <span className="font-bold uppercase">{o.id}.</span> {o.text}
+            <button key={o.id} type="button" disabled={answered} onClick={() => choose(o.id)} className="opt" data-state={state}>
+              <span className="opt-key">{o.id}</span>
+              <span>{o.text}</span>
             </button>
           );
         })}
       </div>
       {answered && (
-        <div className="clay mt-3 p-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
-          <span
-            className={
-              chosen === q.answerId
-                ? 'font-bold text-emerald-600 dark:text-emerald-400'
-                : 'font-bold text-rose-500 dark:text-rose-400'
-            }
-          >
-            {chosen === q.answerId ? 'Correct. ' : 'Not quite. '}
-          </span>
+        <p className="verdict reveal-in" data-ok={chosen === q.answerId}>
+          <span className="verdict-key">{chosen === q.answerId ? 'correct' : 'incorrect'}</span>
           {q.explanation}
-        </div>
+        </p>
       )}
     </div>
   );
@@ -63,9 +47,9 @@ function QuizItem({ q, moduleId }: { q: QuizQuestion; moduleId?: string }) {
 
 export default function Quiz({ questions, moduleId }: { questions: QuizQuestion[]; moduleId?: string }) {
   return (
-    <div className="quiz-list space-y-3">
-      {questions.map((q) => (
-        <QuizItem key={q.id} q={q} moduleId={moduleId} />
+    <div className="quiz-list grid gap-3">
+      {questions.map((q, i) => (
+        <QuizItem key={q.id} q={q} moduleId={moduleId} n={i + 1} />
       ))}
     </div>
   );

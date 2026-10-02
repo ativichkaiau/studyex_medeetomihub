@@ -3,170 +3,87 @@ import EcgStrip from './EcgStrip';
 import MurmurStrip from './MurmurStrip';
 import Quiz from './Quiz';
 import RecallGate from './RecallGate';
-import { Rich } from './Rich';
-import { sectionColors, type SectionColor } from '../lib/theme';
-import type { Lecture } from '../lib/types';
+import SectionLabel from './ui/SectionLabel';
+import { Findings, HighYieldList, Investigations, Mnemonics, Traps, Treatment } from './LectureSections';
+import { pad2 } from '../lib/paths';
+import type { Figure, Lecture } from '../lib/types';
 
-// Full content of one lecture module (all sections), with color-coded labels.
-// Shared by the single-module page and the whole-lecture page.
+// The full content of one module, read as documentation: each section is a
+// labelled block (HIGH_YIELD, MECHANISM, EXAM_TRAPS …) rather than a card.
+// Shared by the module page and the whole-lecture scroll; the section
+// renderers live in LectureSections so the concept modes can reuse them.
 
-function Label({ color, children }: { color: SectionColor; children: React.ReactNode }) {
+export function Figures({ items }: { items: Figure[] }) {
   return (
-    <div className="mb-3 flex items-center gap-2">
-      <span className={`h-2.5 w-2.5 rounded-full ${color.dot}`} />
-      <h3 className={`text-sm font-bold uppercase tracking-wide ${color.text}`}>{children}</h3>
+    <div>
+      {items.map((f, i) => (
+        <figure key={i} className="fig">
+          <figcaption className="fig-head">
+            <strong>{f.title}</strong>
+            <span>FIG_{pad2(i + 1)}</span>
+          </figcaption>
+          <div className="fig-body">
+            {f.ecg ? <EcgStrip rhythm={f.ecg} /> : f.murmur ? <MurmurStrip murmur={f.murmur} /> : f.svg ? <div dangerouslySetInnerHTML={{ __html: f.svg }} /> : null}
+          </div>
+          {f.caption ? <p className="fig-caption">{f.caption}</p> : null}
+        </figure>
+      ))}
     </div>
   );
 }
 
-function Card({ children }: { children: React.ReactNode }) {
-  return <section className="clay clay-surface p-5">{children}</section>;
+interface Section {
+  key: string;
+  label: string;
+  tone?: 'danger';
+  meta?: string;
+  body: React.ReactNode;
 }
 
-export default function LectureBody({ lecture: l }: { lecture: Lecture }) {
-  return (
-    <div className="lecture-body space-y-5">
-      {/* High-yield (recall-first) */}
-      <Card>
-        <Label color={sectionColors.highYield}>High-yield summary</Label>
+export default function LectureBody({ lecture: l, toc = false }: { lecture: Lecture; toc?: boolean }) {
+  const pathology = l.system === 'pathology';
+  const sections: Section[] = [
+    {
+      key: 'high-yield',
+      label: 'high_yield',
+      body: (
         <RecallGate>
-          <ul className="list-disc space-y-1.5 pl-5 text-[15px] leading-relaxed text-slate-700 dark:text-slate-200">
-            {l.highYield.map((h, i) => (
-              <li key={i}>
-                <Rich text={h} />
-              </li>
-            ))}
-          </ul>
+          <HighYieldList items={l.highYield} />
         </RecallGate>
-      </Card>
+      ),
+    },
+    { key: 'mechanism', label: 'mechanism', body: <MechanismChain chain={l.mechanism} /> },
+  ];
+  if (l.figures && l.figures.length > 0) {
+    sections.push({ key: 'figures', label: 'figures', meta: `${l.figures.length}`, body: <Figures items={l.figures} /> });
+  }
+  if (l.examFindings.length > 0) {
+    sections.push({ key: 'findings', label: pathology ? 'pathological_findings' : 'exam_findings', body: <Findings items={l.examFindings} /> });
+  }
+  if (l.investigations.length > 0) {
+    sections.push({ key: 'investigations', label: 'investigations', body: <Investigations items={l.investigations} /> });
+  }
+  if (l.treatment.length > 0) {
+    sections.push({ key: 'treatment', label: pathology ? 'clinical_implications' : 'treatment_logic', body: <Treatment items={l.treatment} /> });
+  }
+  if (l.mnemonics.length > 0) sections.push({ key: 'mnemonics', label: 'mnemonics', body: <Mnemonics items={l.mnemonics} /> });
+  if (l.traps.length > 0) {
+    sections.push({ key: 'traps', label: 'exam_traps', tone: 'danger', meta: `${l.traps.length} failure case${l.traps.length === 1 ? '' : 's'}`, body: <Traps items={l.traps} /> });
+  }
+  if (l.quiz.length > 0) {
+    sections.push({ key: 'recall', label: 'active_recall', meta: `${l.quiz.length} q`, body: <Quiz questions={l.quiz} moduleId={l.id} /> });
+  }
 
-      {/* Mechanism */}
-      <MechanismChain chain={l.mechanism} />
-
-      {/* Diagrams: EKG / physiology / pathology */}
-      {l.figures && l.figures.length > 0 && (
-        <Card>
-          <div className="mb-3 flex items-center gap-2">
-            <span className="h-2.5 w-2.5 rounded-full bg-red-500" />
-            <h3 className="text-sm font-bold uppercase tracking-wide text-red-600 dark:text-red-400">
-              Diagrams
-            </h3>
-          </div>
-          <div className="space-y-4">
-            {l.figures.map((f, i) => (
-              <figure key={i}>
-                <figcaption className="mb-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200">
-                  {f.title}
-                </figcaption>
-                {f.ecg ? (
-                  <EcgStrip rhythm={f.ecg} />
-                ) : f.murmur ? (
-                  <MurmurStrip murmur={f.murmur} />
-                ) : f.svg ? (
-                  <div dangerouslySetInnerHTML={{ __html: f.svg }} />
-                ) : null}
-                {f.caption ? (
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{f.caption}</p>
-                ) : null}
-              </figure>
-            ))}
-          </div>
-        </Card>
-      )}
-
-      {/* Exam findings */}
-      <Card>
-        <Label color={sectionColors.exam}>{l.system === 'pathology' ? 'Pathological & clinical findings' : 'Physical examination findings'}</Label>
-        <div className="divide-y divide-black/5 dark:divide-white/10">
-          {l.examFindings.map((f, i) => (
-            <div key={i} className="flex items-start gap-3 py-2">
-              <span
-                className={`mt-0.5 shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-bold ${
-                  f.significance === 'key'
-                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/45 dark:text-emerald-200'
-                    : 'bg-black/5 text-slate-500 dark:bg-white/10 dark:text-slate-400'
-                }`}
-              >
-                {f.significance === 'key' ? '★ key' : 'support'}
-              </span>
-              <div className="text-sm">
-                <span className="font-semibold text-slate-900 dark:text-white">{f.sign}</span>
-                <span className="text-slate-500 dark:text-slate-400"> — {f.mechanism}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </Card>
-
-      {/* Investigations + Treatment */}
-      <div className="grid gap-5 sm:grid-cols-2">
-        <Card>
-          <Label color={sectionColors.investigation}>Investigations</Label>
-          <ul className="space-y-2 text-sm">
-            {l.investigations.map((iv, i) => (
-              <li key={i}>
-                <span className="font-semibold text-slate-900 dark:text-white">{iv.clue}</span>
-                <span className="text-slate-500 dark:text-slate-400"> — {iv.meaning}</span>
-              </li>
-            ))}
-          </ul>
-        </Card>
-        <Card>
-          <Label color={sectionColors.treatment}>{l.system === 'pathology' ? 'Clinical implications' : 'Treatment logic'}</Label>
-          <ul className="space-y-2 text-sm">
-            {l.treatment.map((t, i) => (
-              <li key={i}>
-                <span className="font-semibold text-slate-900 dark:text-white">{t.logic}</span>
-                {t.detail ? <span className="text-slate-500 dark:text-slate-400"> — <Rich text={t.detail} /></span> : null}
-              </li>
-            ))}
-          </ul>
-        </Card>
-      </div>
-
-      {/* Mnemonics */}
-      {l.mnemonics.length > 0 && (
-        <Card>
-          <Label color={sectionColors.mnemonic}>Mnemonics</Label>
-          <div className="space-y-3">
-            {l.mnemonics.map((m, i) => (
-              <div key={i} className="clay-node bg-violet-100 p-4 dark:bg-violet-900/40">
-                <div className="text-base font-bold text-violet-900 dark:text-violet-100">“{m.hook}”</div>
-                <div className="mt-1 text-sm text-violet-800 dark:text-violet-200">{m.expansion.join(' · ')}</div>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
-
-      {/* Traps */}
-      <Card>
-        <Label color={sectionColors.trap}>Common exam traps</Label>
-        <div className="space-y-3">
-          {l.traps.map((t, i) => (
-            <div key={i} className="clay-node bg-rose-100 p-4 text-sm dark:bg-rose-900/35">
-              <div className="text-xs font-bold uppercase tracking-wide text-rose-600 dark:text-rose-300">
-                Question category: {t.questionCategory}
-              </div>
-              <div className="mt-2 flex items-start gap-2">
-                <span className="font-bold text-rose-500">✗</span>
-                <span className="text-slate-700 dark:text-slate-200">{t.wrongInstinct}</span>
-              </div>
-              <div className="mt-1 flex items-start gap-2">
-                <span className="font-bold text-emerald-600 dark:text-emerald-400">✓</span>
-                <span className="font-medium text-slate-900 dark:text-white">{t.rightAnswer}</span>
-              </div>
-              <div className="mt-2 text-slate-600 dark:text-slate-300">{t.why}</div>
-            </div>
-          ))}
-        </div>
-      </Card>
-
-      {/* Quiz */}
-      <Card>
-        <Label color={sectionColors.quiz}>Active recall</Label>
-        <Quiz questions={l.quiz} moduleId={l.id} />
-      </Card>
+  return (
+    <div className="doc lecture-body">
+      {sections.map((s, i) => (
+        <section key={s.key} className="doc-section" aria-labelledby={`${l.id}--${s.key}`}>
+          <SectionLabel id={`${l.id}--${s.key}`} no={pad2(i + 1)} tone={s.tone} meta={s.meta} toc={toc ? s.label : undefined} as="h3">
+            {s.label}
+          </SectionLabel>
+          {s.body}
+        </section>
+      ))}
     </div>
   );
 }

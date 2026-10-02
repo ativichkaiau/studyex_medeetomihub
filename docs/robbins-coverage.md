@@ -1,6 +1,6 @@
 # Robbins Basic Pathology study layer
 
-The reading spine follows the 23 chapters of *Robbins Basic Pathology*, ninth edition, by Kumar, Abbas and Aster. The supplied PDF filename includes 2012; its copyright page states ©2013, which is the year shown in the app. The five study units are WilliamsHub editorial groupings, not textbook units.
+The reading spine follows the 23 chapters of *Robbins Basic Pathology*, ninth edition, by Kumar, Abbas and Aster. The supplied PDF filename includes 2012; its copyright page states ©2013, which is the year shown in the app. The five study units are studyex_medeetomihub editorial groupings, not textbook units.
 
 ## Current scope
 

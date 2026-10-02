@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import type { CSSProperties } from 'react';
 import { notFound } from 'next/navigation';
 import { lectures, lectureById, lectureSetSlug, subjectOfSource, subjectSlug, subjectByCode } from '../../../content';
 import LectureBody from '../../../components/LectureBody';
@@ -7,13 +6,20 @@ import ActiveIntegrationPanel from '../../../components/ActiveIntegrationPanel';
 import ConceptModeController from '../../../components/concept/ConceptModeController';
 import BookmarkButton from '../../../components/BookmarkButton';
 import AskAboutButton from '../../../components/AskAboutButton';
-import HubIcon from '../../../components/HubIcon';
 import ModuleNotes from '../../../components/ModuleNotes';
 import VisitTracker from '../../../components/VisitTracker';
 import LearningPath from '../../../components/LearningPath';
+import DocIndex from '../../../components/DocIndex';
+import Page from '../../../components/ui/Page';
+import Meta from '../../../components/ui/Meta';
 import { onePagerForModule } from '../../../lib/concept/onepagerForModule';
 import { buildLearningPath } from '../../../lib/integrations/learningPath';
-import { lectureTheme } from '../../../lib/theme';
+import { getModuleBank } from '../../../lib/questions/bank';
+import { lectureCode, lectureName, snake } from '../../../lib/paths';
+import type { Crumb } from '../../../lib/paths';
+
+// Every valid page is generated at build time; anything else is a real 404.
+export const dynamicParams = false;
 
 export function generateStaticParams() {
   return lectures.map((l) => ({ id: l.id }));
@@ -21,7 +27,7 @@ export function generateStaticParams() {
 
 export function generateMetadata({ params }: { params: { id: string } }) {
   const l = lectureById[params.id];
-  return { title: l ? `${l.title} — WilliamsHub` : 'WilliamsHub' };
+  return { title: l ? l.title : 'module' };
 }
 
 export default function LecturePage({ params }: { params: { id: string } }) {
@@ -30,100 +36,100 @@ export default function LecturePage({ params }: { params: { id: string } }) {
 
   const subjectCode = subjectOfSource[l.source];
   const subject = subjectCode ? subjectByCode[subjectCode] : undefined;
-  const theme = lectureTheme(l.source);
-
+  const setHref = `/lecture-set/${lectureSetSlug(l.source)}`;
   const onePager = onePagerForModule(l);
   const learningPath = buildLearningPath(l.id);
+  const questions = getModuleBank(l.id).length;
+
+  const crumbs: Crumb[] = [
+    { label: 'library', href: '/library' },
+    ...(subjectCode ? [{ label: subjectCode, href: `/subject/${subjectSlug(subjectCode)}` }] : []),
+    { label: lectureCode(l.source), href: setHref },
+    { label: snake(l.id) },
+  ];
 
   return (
-    <main className="mx-auto max-w-3xl px-5 py-8">
+    <Page crumbs={crumbs} width="max-w-[1060px]">
       <VisitTracker moduleId={l.id} />
-      <nav
-        aria-label="Breadcrumb"
-        className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-400 dark:text-slate-500"
-      >
-        <Link href="/" className="transition hover:text-slate-700 dark:hover:text-slate-200">
-          All blocks
-        </Link>
-        {subjectCode ? (
-          <>
-            <span aria-hidden className="text-slate-300 dark:text-slate-600">
-              ›
-            </span>
-            <Link
-              href={`/subject/${subjectSlug(subjectCode)}`}
-              className="font-semibold text-[#1e5bd6] transition hover:underline dark:text-[#7AA0FF]"
-            >
-              {subjectCode}
-              {subject?.name ? ` — ${subject.name}` : ''}
-            </Link>
-            {subject?.year ? (
-              <span className="clay-pill px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-300">
-                {subject.yearLabel}
-              </span>
+      <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_200px] xl:gap-12">
+        <article className="min-w-0">
+          <header className="mb-8">
+            <div className="kicker">
+              <strong>module</strong>
+              <span>{[subjectCode, lectureCode(l.source)].filter(Boolean).join('/')}</span>
+              <span>·</span>
+              <span>{l.system}</span>
+            </div>
+            <h1 className="page-title">{l.title}</h1>
+            {l.tags.length ? (
+              <div className="mt-4 flex flex-wrap gap-1.5">
+                {l.tags.map((t) => (
+                  <span key={`${t.kind}-${t.label}`} className="tag" title={t.kind}>
+                    {t.label}
+                  </span>
+                ))}
+              </div>
             ) : null}
-          </>
-        ) : null}
-      </nav>
+            <Meta
+              className="mt-5"
+              rows={[
+                ...(subjectCode
+                  ? ([
+                      [
+                        'block',
+                        <Link key="b" href={`/subject/${subjectSlug(subjectCode)}`} className="xref">
+                          {subjectCode}
+                          {subject?.name ? ` — ${subject.name}` : ''}
+                        </Link>,
+                      ],
+                    ] as [string, React.ReactNode][])
+                  : []),
+                [
+                  subject?.yearLabel === 'Reference' ? 'chapter' : 'lecture',
+                  <Link key="l" href={setHref} className="xref">
+                    {lectureCode(l.source)} — {lectureName(l.source)}
+                  </Link>,
+                ],
+                ['id', snake(l.id)],
+                ['traps', String(l.traps.length)],
+                ['questions', String(questions)],
+                ['updated', l.updated],
+              ]}
+            />
+            <div className="mt-6 flex flex-wrap gap-2">
+              <Link href={`/flashcards/${l.id}`} className="btn">
+                cards <span aria-hidden="true">→</span>
+              </Link>
+              <Link href={`/practice/${l.id}`} className="btn">
+                practice <span aria-hidden="true">→</span>
+              </Link>
+              <AskAboutButton />
+              <BookmarkButton moduleId={l.id} />
+            </div>
+          </header>
 
-      <header className="mb-6 mt-4" data-reveal>
-        <div className={`mb-4 h-1 w-full rounded-full bg-gradient-to-r ${theme.grad}`} />
-        <Link
-          href={`/lecture-set/${lectureSetSlug(l.source)}`}
-          className={`inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wide transition hover:opacity-80 ${theme.text}`}
-        >
-          <span className={`h-2 w-2 rounded-full ${theme.dot}`} />
-          {l.source}
-        </Link>
-        <div className="mt-2 flex items-start justify-between gap-3">
-          <h1 className="text-3xl font-semibold tracking-tight text-[var(--ink)]">{l.title}</h1>
-          <div className="flex shrink-0 items-center gap-2">
-            <Link
-              href={`/flashcards/${l.id}`}
-              className="clay-pill inline-flex min-h-9 items-center gap-1.5 px-3 py-2 text-xs font-medium text-[var(--accent)] transition hover:border-[var(--accent)] active:translate-y-px"
-            >
-              <HubIcon name="cards" /> Cards
-            </Link>
-            <Link
-              href={`/practice/${l.id}`}
-              className="clay-pill inline-flex min-h-9 items-center gap-1.5 px-3 py-2 text-xs font-medium text-[var(--accent)] transition hover:border-[var(--accent)] active:translate-y-px"
-            >
-              <HubIcon name="practice" /> Practice
-            </Link>
-            <AskAboutButton />
-            <BookmarkButton moduleId={l.id} />
+          <details className="panel mb-8 xl:hidden">
+            <summary className="panel-head cursor-pointer select-none border-b-0">index</summary>
+            <div className="border-t border-line p-4">
+              <DocIndex title="on this page" />
+            </div>
+          </details>
+
+          <ConceptModeController lecture={l} onePager={onePager} toc>
+            <LectureBody lecture={l} toc />
+          </ConceptModeController>
+
+          <LearningPath view={learningPath} id="learning-path" />
+          <ActiveIntegrationPanel moduleId={l.id} id="integrations" />
+          <ModuleNotes moduleId={l.id} id="notes" />
+        </article>
+
+        <aside className="hidden xl:block" aria-label="Module index">
+          <div className="sticky top-[calc(var(--pathbar-h)+28px)]">
+            <DocIndex />
           </div>
-        </div>
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {l.tags.map((t) => (
-            <span key={`${t.kind}-${t.label}`} className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${theme.chipBg}`}>
-              {t.label}
-            </span>
-          ))}
-        </div>
-      </header>
-
-      <div data-reveal style={{ '--reveal-i': 1 } as CSSProperties}>
-        <ConceptModeController lecture={l} onePager={onePager}>
-          <LectureBody lecture={l} />
-        </ConceptModeController>
+        </aside>
       </div>
-
-      <div data-reveal style={{ '--reveal-i': 2 } as CSSProperties}>
-        <LearningPath view={learningPath} />
-      </div>
-
-      <div data-reveal style={{ '--reveal-i': 3 } as CSSProperties}>
-        <ActiveIntegrationPanel moduleId={l.id} />
-      </div>
-
-      <div data-reveal style={{ '--reveal-i': 4 } as CSSProperties}>
-        <ModuleNotes moduleId={l.id} />
-      </div>
-
-      <footer className="mt-10 text-center text-xs text-[var(--muted)]" data-reveal>
-        WilliamsHub · M-8 · a VESTRIPPN3.0 satellite
-      </footer>
-    </main>
+    </Page>
   );
 }
