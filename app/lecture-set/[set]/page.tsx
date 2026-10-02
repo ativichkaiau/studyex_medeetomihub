@@ -13,6 +13,7 @@ import { onePagerForModule } from '../../../lib/concept/onepagerForModule';
 import { getModuleBank } from '../../../lib/questions/bank';
 import { lectureCode, lectureName, pad2, snake } from '../../../lib/paths';
 import type { Crumb } from '../../../lib/paths';
+import { pageMeta } from '../../../lib/meta';
 
 // Every valid page is generated at build time; anything else is a real 404.
 export const dynamicParams = false;
@@ -23,7 +24,10 @@ export function generateStaticParams() {
 
 export function generateMetadata({ params }: { params: { set: string } }) {
   const s = lectureSetBySlug[lectureSetRedirects[params.set] ?? params.set];
-  return { title: s ? s.source : 'lecture' };
+  if (!s) return { title: 'not found' };
+  const where = [subjectOfSource[s.source], lectureCode(s.source)].filter(Boolean).join('/');
+  const description = `${where} · ${s.items.length} module${s.items.length === 1 ? '' : 's'} on one study scroll: ${s.items.map((l) => l.title).join(', ')}.`;
+  return pageMeta({ title: s.source, description, path: `/lecture-set/${s.slug}` });
 }
 
 // The whole lecture on one scroll — the primary study view. Every module in

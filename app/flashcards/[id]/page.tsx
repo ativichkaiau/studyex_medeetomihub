@@ -6,6 +6,7 @@ import FlashcardSession from '../../../components/FlashcardSession';
 import Page from '../../../components/ui/Page';
 import PageHeader from '../../../components/ui/PageHeader';
 import { lectureCode, snake } from '../../../lib/paths';
+import { pageMeta } from '../../../lib/meta';
 
 // Every valid page is generated at build time; anything else is a real 404.
 export const dynamicParams = false;
@@ -16,7 +17,13 @@ export function generateStaticParams() {
 
 export function generateMetadata({ params }: { params: { id: string } }) {
   const l = lectureById[params.id];
-  return { title: l ? `cards: ${l.title}` : 'cards' };
+  if (!l) return { title: 'not found' };
+  const n = buildFlashcards([l]).length;
+  return pageMeta({
+    title: `cards: ${l.title}`,
+    description: `${n} active-recall card${n === 1 ? '' : 's'} from ${l.title}: high-yield points, exam traps, findings and mnemonics.`,
+    path: `/flashcards/${l.id}`,
+  });
 }
 
 export default function ModuleFlashcardsPage({ params }: { params: { id: string } }) {

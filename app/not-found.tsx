@@ -1,7 +1,7 @@
 import Page from '../components/ui/Page';
 import NotFoundBody from '../components/NotFoundBody';
 
-export const metadata = { title: 'not found' };
+export const metadata = { title: 'not found', robots: { index: false } };
 
 export default function NotFound() {
   return (

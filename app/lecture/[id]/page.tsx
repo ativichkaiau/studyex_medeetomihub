@@ -17,6 +17,8 @@ import { buildLearningPath } from '../../../lib/integrations/learningPath';
 import { getModuleBank } from '../../../lib/questions/bank';
 import { lectureCode, lectureName, snake } from '../../../lib/paths';
 import type { Crumb } from '../../../lib/paths';
+import { pageMeta } from '../../../lib/meta';
+import { leadSentence } from '../../../lib/concept/modes';
 
 // Every valid page is generated at build time; anything else is a real 404.
 export const dynamicParams = false;
@@ -27,7 +29,10 @@ export function generateStaticParams() {
 
 export function generateMetadata({ params }: { params: { id: string } }) {
   const l = lectureById[params.id];
-  return { title: l ? l.title : 'module' };
+  if (!l) return { title: 'not found' };
+  const where = [subjectOfSource[l.source], lectureCode(l.source)].filter(Boolean).join('/');
+  const lead = l.highYield[0] ? leadSentence(l.highYield[0]) : l.mechanism.title;
+  return pageMeta({ title: l.title, description: `${where} · ${lead}`, path: `/lecture/${l.id}` });
 }
 
 export default function LecturePage({ params }: { params: { id: string } }) {

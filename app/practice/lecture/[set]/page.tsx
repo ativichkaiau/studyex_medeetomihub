@@ -5,6 +5,7 @@ import PracticeSession from '../../../../components/PracticeSession';
 import SessionConfig from '../../../../components/SessionConfig';
 import Page from '../../../../components/ui/Page';
 import { lectureCode, lectureName } from '../../../../lib/paths';
+import { pageMeta } from '../../../../lib/meta';
 
 // Every valid page is generated at build time; anything else is a real 404.
 export const dynamicParams = false;
@@ -15,7 +16,13 @@ export function generateStaticParams() {
 
 export function generateMetadata({ params }: { params: { set: string } }) {
   const s = lectureSetBySlug[lectureSetRedirects[params.set] ?? params.set];
-  return { title: s ? `practice: ${s.source}` : 'practice' };
+  if (!s) return { title: 'not found' };
+  const total = s.items.reduce((n, m) => n + getModuleBank(m.id).length, 0);
+  return pageMeta({
+    title: `practice: ${s.source}`,
+    description: `${total.toLocaleString('en-US')} questions across ${s.items.length} module${s.items.length === 1 ? '' : 's'} in ${s.source}, up to ${Math.min(20, total)} per session.`,
+    path: `/practice/lecture/${s.slug}`,
+  });
 }
 
 export default function LecturePracticePage({ params }: { params: { set: string } }) {

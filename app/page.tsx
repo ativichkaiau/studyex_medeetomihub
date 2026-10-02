@@ -12,6 +12,9 @@ import { BRAND, BUILD } from '../lib/brand';
 import { INDEX_STATS, TRAP_COUNT } from '../lib/indexStats';
 import { getModuleBank } from '../lib/questions/bank';
 import { lectureCode, snake, yearCode } from '../lib/paths';
+import { pageMeta } from '../lib/meta';
+
+export const metadata = pageMeta({ path: '/' });
 
 export default function Overview() {
   const questions = lectures.reduce((n, l) => n + getModuleBank(l.id).length, 0);

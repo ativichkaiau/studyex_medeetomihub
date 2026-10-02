@@ -22,6 +22,7 @@ import Panel from '../../../components/ui/Panel';
 import Meta from '../../../components/ui/Meta';
 import { SeenCount, SeenMarker } from '../../../components/library/Seen';
 import type { Lecture } from '../../../lib/types';
+import { pageMeta } from '../../../lib/meta';
 
 // Every valid page is generated at build time; anything else is a real 404.
 export const dynamicParams = false;
@@ -32,7 +33,13 @@ export function generateStaticParams() {
 
 export function generateMetadata({ params }: { params: { code: string } }) {
   const s = subjectBySlug[params.code];
-  return { title: s ? `${s.code} ${s.name}` : 'block' };
+  if (!s) return { title: 'not found' };
+  const mods = lecturesBySubject[s.code] ?? [];
+  const unit = s.yearLabel === 'Reference' ? 'chapters' : 'lectures';
+  const description = mods.length
+    ? `${s.code} — ${s.name}: ${new Set(mods.map((l) => l.source)).size} ${unit}, ${mods.length} modules and ${mods.reduce((n, l) => n + l.traps.length, 0)} exam traps, each lecture as one study scroll.`
+    : `${s.code} — ${s.name}: a reading spine of ${referenceFrameworkByCode[s.code]?.chapters.length ?? 0} chapters.`;
+  return pageMeta({ title: `${s.code} ${s.name}`, description, path: `/subject/${params.code}` });
 }
 
 const LECTURE_COLS = '64px minmax(0,1fr) auto 56px';

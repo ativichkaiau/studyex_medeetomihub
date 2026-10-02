@@ -10,13 +10,13 @@ import StatusBar from '../components/shell/StatusBar';
 import ShellRuntime from '../components/shell/ShellRuntime';
 import ShortcutHelp from '../components/shell/ShortcutHelp';
 import { ThemeRuntime } from '../components/shell/prefs';
-import { BRAND } from '../lib/brand';
+import { BRAND, SITE_URL } from '../lib/brand';
 import { INDEX_STATS } from '../lib/indexStats';
 import { appearanceScript } from '../lib/appearance';
 import { motionScript } from '../lib/motion';
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://williamshub.vercel.app'),
+  metadataBase: new URL(SITE_URL),
   title: {
     default: `${BRAND.name} // ${BRAND.kind}`,
     template: `%s // ${BRAND.name}`,
@@ -30,7 +30,7 @@ export const metadata: Metadata = {
     description: BRAND.description,
   },
   twitter: {
-    card: 'summary',
+    card: 'summary_large_image',
     title: `${BRAND.name} // ${BRAND.kind}`,
     description: BRAND.description,
   },

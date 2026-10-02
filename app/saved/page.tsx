@@ -1,8 +1,13 @@
 import SavedTree from '../../components/SavedTree';
 import Page from '../../components/ui/Page';
 import PageHeader from '../../components/ui/PageHeader';
+import { pageMeta } from '../../lib/meta';
 
-export const metadata = { title: 'saved' };
+export const metadata = pageMeta({
+  title: 'saved',
+  description: 'Pinned modules and per-module notes, grouped by block and stored on this device.',
+  path: '/saved',
+});
 
 export default function SavedPage() {
   return (

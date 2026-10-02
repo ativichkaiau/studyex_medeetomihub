@@ -7,8 +7,13 @@ import PageHeader from '../../components/ui/PageHeader';
 import Meta from '../../components/ui/Meta';
 import { getModuleBank } from '../../lib/questions/bank';
 import { yearCode } from '../../lib/paths';
+import { pageMeta } from '../../lib/meta';
 
-export const metadata = { title: 'practice' };
+export const metadata = pageMeta({
+  title: 'practice',
+  description: 'Question sessions sampled from the module bank: content, exam traps and integration links, by block, lecture or module.',
+  path: '/practice',
+});
 
 const COLS = '84px minmax(0,1fr) 72px 88px 56px';
 const COLS_SM = '72px minmax(0,1fr) 40px';

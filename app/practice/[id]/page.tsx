@@ -5,6 +5,7 @@ import PracticeSession from '../../../components/PracticeSession';
 import SessionConfig from '../../../components/SessionConfig';
 import Page from '../../../components/ui/Page';
 import { lectureCode, snake } from '../../../lib/paths';
+import { pageMeta } from '../../../lib/meta';
 
 // Every valid page is generated at build time; anything else is a real 404.
 export const dynamicParams = false;
@@ -15,7 +16,13 @@ export function generateStaticParams() {
 
 export function generateMetadata({ params }: { params: { id: string } }) {
   const l = lectureById[params.id];
-  return { title: l ? `practice: ${l.title}` : 'practice' };
+  if (!l) return { title: 'not found' };
+  const n = getModuleBank(l.id).length;
+  return pageMeta({
+    title: `practice: ${l.title}`,
+    description: `${n} practice question${n === 1 ? '' : 's'} on ${l.title}, from its content, exam traps and integration links.`,
+    path: `/practice/${l.id}`,
+  });
 }
 
 export default function ModulePracticePage({ params }: { params: { id: string } }) {

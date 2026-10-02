@@ -5,6 +5,7 @@ import { buildFlashcards } from '../../../../lib/flashcards/build';
 import FlashcardSession from '../../../../components/FlashcardSession';
 import Page from '../../../../components/ui/Page';
 import PageHeader from '../../../../components/ui/PageHeader';
+import { pageMeta } from '../../../../lib/meta';
 
 // Every valid page is generated at build time; anything else is a real 404.
 export const dynamicParams = false;
@@ -15,7 +16,13 @@ export function generateStaticParams() {
 
 export function generateMetadata({ params }: { params: { code: string } }) {
   const s = subjectBySlug[params.code];
-  return { title: s ? `cards: ${s.code}` : 'cards' };
+  if (!s) return { title: 'not found' };
+  const mods = lecturesBySubject[s.code] ?? [];
+  return pageMeta({
+    title: `cards: ${s.code}`,
+    description: `${buildFlashcards(mods, PER_MODULE).length} recall cards across ${mods.length} modules of ${s.code} ${s.name}, reshuffled every run.`,
+    path: `/flashcards/block/${params.code}`,
+  });
 }
 
 // Keep block decks focused: a couple of the highest-value cards per topic.

@@ -4,6 +4,7 @@ import { getModuleBank } from '../../../../../lib/questions/bank';
 import PracticeSession from '../../../../../components/PracticeSession';
 import SessionConfig from '../../../../../components/SessionConfig';
 import Page from '../../../../../components/ui/Page';
+import { pageMeta } from '../../../../../lib/meta';
 
 // Every valid page is generated at build time; anything else is a real 404.
 export const dynamicParams = false;
@@ -14,7 +15,14 @@ export function generateStaticParams() {
 
 export function generateMetadata({ params }: { params: { code: string } }) {
   const s = subjectBySlug[params.code];
-  return { title: s ? `practice: ${s.code} (whole block)` : 'practice' };
+  if (!s) return { title: 'not found' };
+  const mods = lecturesBySubject[s.code] ?? [];
+  const total = mods.reduce((n, m) => n + getModuleBank(m.id).length, 0);
+  return pageMeta({
+    title: `practice: ${s.code} (whole block)`,
+    description: `Mixed sessions of up to ${Math.min(20, total)} drawn from ${total.toLocaleString('en-US')} questions across ${mods.length} modules of ${s.code} ${s.name}.`,
+    path: `/practice/block/${params.code}/all`,
+  });
 }
 
 export default function BlockAllPracticePage({ params }: { params: { code: string } }) {

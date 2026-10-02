@@ -5,8 +5,13 @@ import Page from '../../../components/ui/Page';
 import PageHeader from '../../../components/ui/PageHeader';
 import LibraryTabs from '../../../components/library/LibraryTabs';
 import Meta from '../../../components/ui/Meta';
+import { pageMeta } from '../../../lib/meta';
 
-export const metadata = { title: 'onepagers' };
+export const metadata = pageMeta({
+  title: 'onepagers',
+  description: 'The OnePager archive: compiled one-page summaries per subject, kept in Google Drive and linked to the interactive library.',
+  path: '/library/onepagers',
+});
 
 // The OnePager archive: the user's own compiled summaries, kept in Google
 // Drive per term/module folder. Each folder is listed as an artifact with the

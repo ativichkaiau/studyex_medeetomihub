@@ -7,8 +7,13 @@ import PageHeader from '../../components/ui/PageHeader';
 import Meta from '../../components/ui/Meta';
 import LiveCount from '../../components/overview/LiveCount';
 import { yearCode } from '../../lib/paths';
+import { pageMeta } from '../../lib/meta';
 
-export const metadata = { title: 'cards' };
+export const metadata = pageMeta({
+  title: 'cards',
+  description: 'Active-recall decks built from module content: high-yield points, exam traps, findings, mechanisms and mnemonics, by block or by module.',
+  path: '/flashcards',
+});
 
 // Mirrors the block deck in app/flashcards/block/[code]/page.tsx.
 const PER_MODULE = 2;

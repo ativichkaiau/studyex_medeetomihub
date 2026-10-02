@@ -3,8 +3,13 @@ import { keystonesForSubject } from '../../lib/integrations/centrality';
 import ProgressTelemetry, { type SubjectMeta } from '../../components/ProgressTelemetry';
 import Page from '../../components/ui/Page';
 import PageHeader from '../../components/ui/PageHeader';
+import { pageMeta } from '../../lib/meta';
 
-export const metadata = { title: 'progress' };
+export const metadata = pageMeta({
+  title: 'progress',
+  description: 'Coverage, quiz accuracy, repairs and an activity log, read from this device only.',
+  path: '/progress',
+});
 
 export default function ProgressPage() {
   const subjects: SubjectMeta[] = Object.entries(lecturesBySubject)

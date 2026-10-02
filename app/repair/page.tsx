@@ -3,8 +3,13 @@ import RepairSyncDemo from '../../components/repair/RepairSyncDemo';
 import PodConnectPanel from '../../components/repair/PodConnectPanel';
 import Page from '../../components/ui/Page';
 import PageHeader from '../../components/ui/PageHeader';
+import { pageMeta } from '../../lib/meta';
 
-export const metadata = { title: 'repair' };
+export const metadata = pageMeta({
+  title: 'repair',
+  description: 'Weak knowledge treated like failing tests: misses from practice and WilliamsPod, prioritised by error type, each with its fix.',
+  path: '/repair',
+});
 
 export default function RepairPage() {
   const dev = process.env.NODE_ENV !== 'production';

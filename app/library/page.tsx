@@ -4,8 +4,13 @@ import BlockTable from '../../components/library/BlockTable';
 import LibraryTabs from '../../components/library/LibraryTabs';
 import { blockRows } from '../../lib/blockRows';
 import { INDEX_STATS, TRAP_COUNT } from '../../lib/indexStats';
+import { pageMeta } from '../../lib/meta';
 
-export const metadata = { title: 'library' };
+export const metadata = pageMeta({
+  title: 'library',
+  description: `${INDEX_STATS.lectures.toLocaleString('en-US')} lectures and ${INDEX_STATS.modules.toLocaleString('en-US')} modules across ${INDEX_STATS.blocks} indexed blocks of the MedCMU curriculum, filterable by year.`,
+  path: '/library',
+});
 
 export default function LibraryPage() {
   const { rows, years } = blockRows();

@@ -6,6 +6,7 @@ import Page from '../../../../components/ui/Page';
 import PageHeader from '../../../../components/ui/PageHeader';
 import Meta from '../../../../components/ui/Meta';
 import { lectureCode, lectureName } from '../../../../lib/paths';
+import { pageMeta } from '../../../../lib/meta';
 
 // Every valid page is generated at build time; anything else is a real 404.
 export const dynamicParams = false;
@@ -16,7 +17,14 @@ export function generateStaticParams() {
 
 export function generateMetadata({ params }: { params: { code: string } }) {
   const s = subjectBySlug[params.code];
-  return { title: s ? `practice: ${s.code}` : 'practice' };
+  if (!s) return { title: 'not found' };
+  const mods = lecturesBySubject[s.code] ?? [];
+  const total = mods.reduce((n, m) => n + getModuleBank(m.id).length, 0);
+  return pageMeta({
+    title: `practice: ${s.code}`,
+    description: `Practise ${s.code} ${s.name}: ${total.toLocaleString('en-US')} questions across ${new Set(mods.map((m) => m.source)).size} lectures, one lecture at a time or mixed.`,
+    path: `/practice/block/${params.code}`,
+  });
 }
 
 function lectureNo(source: string): number {
