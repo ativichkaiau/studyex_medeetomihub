@@ -1,9 +1,9 @@
 // Window events the shell uses to open its overlays from anywhere: a button in
 // the sidebar, the status bar, a page, or a keyboard shortcut.
 
-export const SEARCH_OPEN_EVENT = 'williamshub:search';
-export const ASK_OPEN_EVENT = 'williamshub:ask-ai';
-export const SHORTCUTS_OPEN_EVENT = 'williamshub:shortcuts';
+export const SEARCH_OPEN_EVENT = 'studyex:search';
+export const ASK_OPEN_EVENT = 'studyex:ask';
+export const SHORTCUTS_OPEN_EVENT = 'studyex:shortcuts';
 
 export function openSearch(): void {
   window.dispatchEvent(new CustomEvent(SEARCH_OPEN_EVENT));

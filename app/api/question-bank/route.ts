@@ -62,7 +62,7 @@ export function GET(request: Request) {
     return Response.json(
       {
         version: '1.0',
-        source: 'williamshub',
+        source: 'studyex_medeetomihub',
         generatedAt: new Date().toISOString(),
         subjects,
       },
@@ -85,7 +85,7 @@ export function GET(request: Request) {
   return Response.json(
     {
       version: '1.0',
-      source: 'williamshub',
+      source: 'studyex_medeetomihub',
       generatedAt: new Date().toISOString(),
       subject,
       subjects,

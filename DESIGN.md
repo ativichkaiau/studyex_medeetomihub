@@ -1,4 +1,4 @@
-# WilliamsHub (M-8) — Design Doc
+# studyex_medeetomihub — original design doc (as WilliamsHub, M-8)
 
 > Original pedagogical and product brief. For the current studyex interface and route structure, see [docs/redesign.md](docs/redesign.md) and [README.md](README.md).
 

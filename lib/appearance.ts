@@ -28,7 +28,7 @@ export const appearanceScript = `(function(){var m='auto';try{var s=localStorage
 // ── Runtime ──────────────────────────────────────────────────────────────
 // One ThemeRuntime (components/shell/ThemeRuntime.tsx) owns the schedule; the
 // controls only write the choice and announce it.
-export const APPEARANCE_CHANGE_EVENT = 'williamshub:appearance-change';
+export const APPEARANCE_CHANGE_EVENT = 'studyex:appearance-change';
 
 export interface AppearanceState {
   mode: AppearanceMode;

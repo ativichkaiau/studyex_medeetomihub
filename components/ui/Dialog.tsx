@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
-const OPEN_EVENT = 'williamshub:dialog-open';
+const OPEN_EVENT = 'studyex:dialog-open';
 let scrollLocks = 0;
 let previousOverflow = '';
 

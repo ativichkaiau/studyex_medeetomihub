@@ -1,4 +1,4 @@
-export const MOTION_CHANGE_EVENT = 'williamshub:motion-change';
+export const MOTION_CHANGE_EVENT = 'studyex:motion-change';
 export const MOTION_KEY = 'wh-motion';
 
 // Keep a manual choice for this visit even when storage is unavailable.

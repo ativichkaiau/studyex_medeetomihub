@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // OPTIONAL / FUTURE BACKEND — NOT USED BY THE RUNNING APP.
 //
-// WilliamsHub is intentionally static and zero-backend: lecture content and the
+// studyex_medeetomihub is intentionally static and zero-backend: lecture content and the
 // Active-Integration graph are typed TypeScript objects (see lib/integrations/*)
 // resolved at build time, with personal data in localStorage. There is no live
 // database, and `@prisma/client` is deliberately NOT a dependency.
@@ -115,7 +115,7 @@ model RepairRecommendation {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// WilliamsHub Upgrade — concept preferences, repair queue & WilliamsPod telemetry.
+// Hub upgrade — concept preferences, repair queue & WilliamsPod telemetry.
 // Still a documented, NON-wired future mirror. The static app stores these in
 // localStorage (lib/concept, lib/repair, lib/sync). A future WilliamsSync backend
 // would use these tables to sync across devices/users.
