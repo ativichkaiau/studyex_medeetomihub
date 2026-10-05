@@ -218,6 +218,44 @@ pre {
   gap: 3px;
   color: var(--text-primary);
 }
+.brand-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+.brand-molecule {
+  height: 30px;
+  width: auto;
+  flex: none;
+}
+.app-mobilebar .brand-molecule {
+  height: 26px;
+}
+@media (max-width: 359px) {
+  .app-mobilebar .brand-molecule {
+    display: none;
+  }
+}
+.molecule {
+  display: block;
+  overflow: visible;
+  color: var(--text-primary);
+}
+.molecule-n {
+  fill: var(--accent);
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+.formula {
+  white-space: nowrap;
+}
+.formula sub {
+  font-size: 0.72em;
+  letter-spacing: -0.04em;
+  line-height: 0;
+  vertical-align: -0.28em;
+}
 .brand-mark {
   font: 600 13px/1.2 var(--font-mono);
   letter-spacing: -0.01em;
@@ -227,6 +265,7 @@ pre {
   color: var(--accent);
 }
 .brand-sub {
+  margin-top: 6px;
   font: 500 10px/1.2 var(--font-mono);
   letter-spacing: 0.08em;
   color: var(--text-muted);

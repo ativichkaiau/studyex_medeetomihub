@@ -14,6 +14,8 @@ import { BRAND, SITE_URL } from '../lib/brand';
 import { INDEX_STATS } from '../lib/indexStats';
 import { appearanceScript } from '../lib/appearance';
 import { motionScript } from '../lib/motion';
+import Formula from '../components/brand/Formula';
+import MoleculeMark from '../components/brand/MoleculeMark';
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -67,9 +69,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <MobileBar stats={INDEX_STATS} />
           {children}
           <footer className="site-footer">
-            <span>
-              {BRAND.name}
-              <span className="text-accent">_</span>
+            <span className="flex items-center gap-2">
+              <MoleculeMark className="h-4 w-auto text-fg-3" />
+              <span>
+                {BRAND.name}
+                <span className="text-accent">_</span> · <Formula />
+              </span>
             </span>
             <span>
               namespace {BRAND.namespace} · runtime {BRAND.runtime} · alongside your OnePagers

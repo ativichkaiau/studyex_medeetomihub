@@ -13,6 +13,9 @@ import { INDEX_STATS, TRAP_COUNT } from '../lib/indexStats';
 import { getModuleBank } from '../lib/questions/bank';
 import { lectureCode, snake, yearCode } from '../lib/paths';
 import { pageMeta } from '../lib/meta';
+import MoleculeMark from '../components/brand/MoleculeMark';
+import Formula from '../components/brand/Formula';
+import { COMPOUND } from '../lib/molecule';
 
 export const metadata = pageMeta({ path: '/' });
 
@@ -32,19 +35,38 @@ export default function Overview() {
 
   return (
     <Page crumbs={[{ label: 'overview' }]} aside={<span>build {BUILD.date || '—'} · {BUILD.sha}</span>}>
-      <header>
-        <div className="kicker">
-          <strong>{BRAND.tagline}</strong>
-          <span>·</span>
-          <span>
-            build {BUILD.date || '—'} · {BUILD.sha}
-          </span>
+      <header className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
+        <div className="min-w-0">
+          <div className="kicker">
+            <strong>{BRAND.tagline}</strong>
+            <span>·</span>
+            <span>
+              build {BUILD.date || '—'} · {BUILD.sha}
+            </span>
+          </div>
+          <h1 className="mt-3 break-all font-mono text-[26px] font-semibold leading-tight tracking-[-0.03em] text-fg sm:text-[40px]">
+            {BRAND.name}
+            <span className="text-accent">_</span>
+          </h1>
+          <SessionStatus />
         </div>
-        <h1 className="mt-3 break-all font-mono text-[26px] font-semibold leading-tight tracking-[-0.03em] text-fg sm:text-[40px]">
-          {BRAND.name}
-          <span className="text-accent">_</span>
-        </h1>
-        <SessionStatus />
+        <figure className="flex items-center gap-5" aria-labelledby="mark-caption">
+          <MoleculeMark variant="full" className="h-[84px] w-auto sm:h-[100px]" title={`Skeletal formula of ${COMPOUND.name}`} />
+          <figcaption id="mark-caption">
+            <dl className="kv text-[11.5px]">
+              <dt>mark</dt>
+              <dd>{COMPOUND.name}</dd>
+              <dt>formula</dt>
+              <dd>
+                <Formula />
+              </dd>
+              <dt>mass</dt>
+              <dd>{COMPOUND.mass}</dd>
+              <dt>class</dt>
+              <dd>{COMPOUND.role}</dd>
+            </dl>
+          </figcaption>
+        </figure>
       </header>
 
       <div className="gridlines mt-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
